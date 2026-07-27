@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 type Employee = {
   id: string;
@@ -62,6 +63,7 @@ function weekday(date: string) {
 }
 
 export default function RecordsPage() {
+  const searchParams = useSearchParams();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeId, setEmployeeId] = useState("");
   const [month, setMonth] = useState(currentMonth);
@@ -70,6 +72,11 @@ export default function RecordsPage() {
   const [records, setRecords] = useState<RecordsResponse | null>(null);
   const [error, setError] = useState("");
 
+  const requestedEmployeeName = useMemo(
+    () => searchParams.get("name")?.trim() ?? "",
+    [searchParams],
+  );
+
   useEffect(() => {
     fetch("/api/employees")
       .then((res) => res.json())
@@ -77,11 +84,11 @@ export default function RecordsPage() {
       .catch(() => setEmployees([]));
   }, []);
 
-  async function loadRecords(nextMonth = month) {
+  async function loadRecords(nextEmployeeId = employeeId, nextMonth = month) {
     setError("");
     setRecords(null);
-    if (!employeeId) {
-      setError("직원을 선택해 주세요.");
+    if (!nextEmployeeId) {
+      setError("로그인된 사용자의 기록을 찾지 못했습니다.");
       return;
     }
 
@@ -91,7 +98,7 @@ export default function RecordsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          employeeId,
+          employeeId: nextEmployeeId,
           month: nextMonth,
         }),
       });
@@ -108,10 +115,50 @@ export default function RecordsPage() {
     }
   }
 
+  useEffect(() => {
+    if (employees.length === 0) return;
+
+    const storedEmployeeId =
+      typeof window === "undefined"
+        ? ""
+        : window.sessionStorage.getItem("workboardEmployeeId") ?? "";
+    const storedEmployeeName =
+      typeof window === "undefined"
+        ? ""
+        : window.sessionStorage.getItem("workboardEmployeeName") ?? "";
+
+    const matchedById =
+      storedEmployeeId &&
+      employees.find((employee) => employee.id === storedEmployeeId);
+    const matchedByName =
+      (requestedEmployeeName || storedEmployeeName) &&
+      employees.find(
+        (employee) =>
+          employee.name.trim() ===
+          (requestedEmployeeName || storedEmployeeName).trim(),
+      );
+    const matched = matchedById ?? matchedByName ?? null;
+
+    if (!matched) {
+      setError("로그인된 사용자의 기록을 찾지 못했습니다.");
+      return;
+    }
+
+    window.sessionStorage.setItem("workboardEmployeeName", matched.name);
+    window.sessionStorage.setItem("workboardEmployeeId", matched.id);
+
+    if (employeeId === matched.id && records) {
+      return;
+    }
+
+    setEmployeeId(matched.id);
+    void loadRecords(matched.id, month);
+  }, [employeeId, employees, month, records, requestedEmployeeName]);
+
   function changeMonth(value: string) {
     setMonth(value);
     if (records) {
-      void loadRecords(value);
+      void loadRecords(employeeId, value);
     }
   }
 
@@ -121,7 +168,7 @@ export default function RecordsPage() {
         <div>
           <h1 className="text-2xl font-bold">출퇴근 기록부</h1>
           <p className="text-sm text-slate-500">
-            직원별 월간 출퇴근 시간과 접속 위치를 확인합니다.
+            로그인된 사용자의 월간 출퇴근 시간과 접속 위치를 확인합니다.
           </p>
         </div>
         <Link href="/" className="text-sm text-slate-400 hover:text-slate-600">
@@ -130,34 +177,13 @@ export default function RecordsPage() {
       </div>
 
       <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4">
-        <div className="grid gap-3 md:grid-cols-[1.5fr_auto]">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-slate-600">직원</span>
-            <select
-              value={employeeId}
-              onChange={(event) => {
-                setEmployeeId(event.target.value);
-                setRecords(null);
-              }}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-base"
-            >
-              <option value="">이름을 선택하세요</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name} ({employee.code}
-                  {employee.department ? ` · ${employee.department}` : ""})
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <button
-            onClick={() => loadRecords()}
-            disabled={loading}
-            className="self-end rounded-lg bg-brand px-5 py-3 font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
-          >
-            {loading ? "조회 중…" : "기록 조회"}
-          </button>
+        <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <span className="font-medium text-slate-800">조회 대상</span>
+          <span className="ml-2">
+            {records?.groups[0]?.employee
+              ? `${records.groups[0].employee.name} (${records.groups[0].employee.code})`
+              : "로그인 사용자 확인 중…"}
+          </span>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -189,7 +215,7 @@ export default function RecordsPage() {
 
       {!records ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white py-16 text-center text-slate-400">
-          직원을 선택한 뒤 기록을 조회하세요.
+          로그인된 사용자의 기록을 불러오는 중입니다.
         </div>
       ) : (
         <div className="flex flex-col gap-6">

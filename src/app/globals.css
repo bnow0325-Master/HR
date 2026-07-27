@@ -96,12 +96,14 @@ button {
 .border-slate-100 { border-color: #f1f5f9; }
 .border-slate-200 { border-color: #e2e8f0; }
 .border-slate-300 { border-color: #cbd5e1; }
+.border-slate-900 { border-color: #0f172a; }
 .border-emerald-200 { border-color: #a7f3d0; }
 
 .bg-white { background: #fff; }
 .bg-white\/95 { background: rgba(255,255,255,0.95); }
 .bg-slate-50 { background: #f8fafc; }
 .bg-slate-100 { background: #f1f5f9; }
+.bg-slate-900 { background: #0f172a; }
 .bg-slate-700 { background: #334155; }
 .bg-red-50 { background: #fef2f2; }
 .bg-emerald-50 { background: #ecfdf5; }

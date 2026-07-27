@@ -129,6 +129,8 @@ export default function CheckPage() {
 
     setEmployeeId(matched.id);
     setEmployeeError("");
+    window.sessionStorage.setItem("workboardEmployeeName", matched.name);
+    window.sessionStorage.setItem("workboardEmployeeId", matched.id);
   }, [employeeId, employees, requestedEmployeeName]);
 
   async function resolveAddress(lat: number, lng: number) {
@@ -298,11 +300,29 @@ export default function CheckPage() {
   const canCheckIn =
     !submitting &&
     !attendanceStatus.loading &&
+    geo.status === "ready" &&
     attendanceStatus.nextAction === "IN";
   const canCheckOut =
     !submitting &&
     !attendanceStatus.loading &&
+    geo.status === "ready" &&
     attendanceStatus.nextAction === "OUT";
+
+  const statusMessage = employeeError
+    ? employeeError
+    : geo.status === "loading"
+      ? "현재 위치를 확인하는 중입니다. 잠시만 기다려 주세요."
+      : geo.status === "error"
+        ? geo.message
+        : geo.status === "idle"
+          ? "현재 위치 확인을 준비하고 있습니다."
+          : attendanceStatus.loading
+            ? "현재 출퇴근 상태를 확인하는 중입니다."
+            : attendanceStatus.checkedIn
+              ? "이미 출근 상태입니다. 퇴근 버튼만 사용할 수 있습니다."
+              : "위치 확인이 완료되었습니다. 출근 버튼을 누를 수 있습니다.";
+  const statusTone =
+    employeeError || geo.status === "error" ? "text-red-600" : "text-slate-500";
 
   return (
     <main className="mx-auto flex min-h-full max-w-md flex-col gap-5 px-6 py-8">
@@ -355,12 +375,8 @@ export default function CheckPage() {
         </button>
       </div>
 
-      <div className="text-center text-sm text-slate-500">
-        {attendanceStatus.loading
-          ? "현재 출퇴근 상태를 확인하는 중입니다."
-          : attendanceStatus.checkedIn
-            ? "이미 출근 상태입니다. 퇴근 버튼만 사용할 수 있습니다."
-            : "출근 버튼을 눌러 근무를 시작할 수 있습니다."}
+      <div className={`text-center text-sm ${statusTone}`}>
+        {statusMessage}
       </div>
 
       {result && (
