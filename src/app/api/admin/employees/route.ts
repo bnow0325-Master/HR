@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/adminAuth";
-import { hashPin } from "@/lib/pin";
-
-function isValidPin(pin: unknown): pin is string {
-  return typeof pin === "string" && /^\d{4,6}$/.test(pin);
-}
 
 // 직원 목록 (관리자용, 활성/비활성 모두)
 export async function GET() {
@@ -20,16 +15,11 @@ export async function GET() {
       name: true,
       department: true,
       active: true,
-      pinHash: true,
       createdAt: true,
     },
   });
-  // 해시는 노출하지 않고 PIN 설정 여부만 내려준다.
   return NextResponse.json({
-    employees: employees.map(({ pinHash, ...e }) => ({
-      ...e,
-      hasPin: !!pinHash,
-    })),
+    employees,
   });
 }
 
@@ -43,7 +33,6 @@ export async function POST(req: Request) {
     code?: string;
     name?: string;
     department?: string;
-    pin?: string;
   };
   try {
     body = await req.json();
@@ -61,12 +50,6 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  if (!isValidPin(body.pin)) {
-    return NextResponse.json(
-      { error: "PIN은 4~6자리 숫자여야 합니다." },
-      { status: 400 },
-    );
-  }
 
   const exists = await prisma.employee.findUnique({ where: { code } });
   if (exists) {
@@ -77,7 +60,7 @@ export async function POST(req: Request) {
   }
 
   const employee = await prisma.employee.create({
-    data: { code, name, department, pinHash: hashPin(body.pin) },
+    data: { code, name, department },
     select: { id: true, code: true, name: true, department: true, active: true },
   });
   return NextResponse.json({ ok: true, employee }, { status: 201 });

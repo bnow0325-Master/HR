@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 type Employee = {
@@ -15,6 +15,12 @@ type RecordRow = {
   day: number;
   checkIn: string | null;
   checkOut: string | null;
+  checkInAddress: string;
+  checkOutAddress: string;
+  checkInLatitude: number | null;
+  checkInLongitude: number | null;
+  checkOutLatitude: number | null;
+  checkOutLongitude: number | null;
   workTime: string;
   open: boolean;
 };
@@ -58,8 +64,6 @@ function weekday(date: string) {
 export default function RecordsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeId, setEmployeeId] = useState("");
-  const [pin, setPin] = useState("");
-  const [targetEmployeeId, setTargetEmployeeId] = useState("");
   const [month, setMonth] = useState(currentMonth);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -73,23 +77,11 @@ export default function RecordsPage() {
       .catch(() => setEmployees([]));
   }, []);
 
-  const targetOptions = useMemo(() => {
-    if (!records?.isManager) return [];
-    return records.employees;
-  }, [records]);
-
-  async function loadRecords(
-    nextTargetEmployeeId = targetEmployeeId,
-    nextMonth = month,
-  ) {
+  async function loadRecords(nextMonth = month) {
     setError("");
     setRecords(null);
     if (!employeeId) {
       setError("직원을 선택해 주세요.");
-      return;
-    }
-    if (pin.trim().length < 4) {
-      setError("PIN을 입력해 주세요.");
       return;
     }
 
@@ -100,9 +92,7 @@ export default function RecordsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employeeId,
-          pin: pin.trim(),
           month: nextMonth,
-          targetEmployeeId: nextTargetEmployeeId || undefined,
         }),
       });
       const data = (await res.json()) as RecordsResponse;
@@ -111,9 +101,6 @@ export default function RecordsPage() {
         return;
       }
       setRecords(data);
-      if (!nextTargetEmployeeId) {
-        setTargetEmployeeId(data.isManager ? "ALL" : employeeId);
-      }
     } catch {
       setError("기록을 불러오지 못했습니다.");
     } finally {
@@ -121,15 +108,10 @@ export default function RecordsPage() {
     }
   }
 
-  function changeTarget(value: string) {
-    setTargetEmployeeId(value);
-    void loadRecords(value);
-  }
-
   function changeMonth(value: string) {
     setMonth(value);
     if (records) {
-      void loadRecords(targetEmployeeId, value);
+      void loadRecords(value);
     }
   }
 
@@ -139,7 +121,7 @@ export default function RecordsPage() {
         <div>
           <h1 className="text-2xl font-bold">출퇴근 기록부</h1>
           <p className="text-sm text-slate-500">
-            본인 PIN 확인 후 월별 출퇴근 기록을 조회합니다.
+            직원별 월간 출퇴근 시간과 접속 위치를 확인합니다.
           </p>
         </div>
         <Link href="/" className="text-sm text-slate-400 hover:text-slate-600">
@@ -148,7 +130,7 @@ export default function RecordsPage() {
       </div>
 
       <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4">
-        <div className="grid gap-3 md:grid-cols-[1.5fr_1fr_auto]">
+        <div className="grid gap-3 md:grid-cols-[1.5fr_auto]">
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-slate-600">직원</span>
             <select
@@ -156,7 +138,6 @@ export default function RecordsPage() {
               onChange={(event) => {
                 setEmployeeId(event.target.value);
                 setRecords(null);
-                setTargetEmployeeId("");
               }}
               className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-base"
             >
@@ -168,21 +149,6 @@ export default function RecordsPage() {
                 </option>
               ))}
             </select>
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-slate-600">PIN</span>
-            <input
-              value={pin}
-              onChange={(event) =>
-                setPin(event.target.value.replace(/\D/g, "").slice(0, 6))
-              }
-              type="password"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="본인 PIN"
-              className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-base tracking-[0.35em]"
-            />
           </label>
 
           <button
@@ -212,20 +178,6 @@ export default function RecordsPage() {
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
             />
           )}
-          {records?.isManager && (
-            <select
-              value={targetEmployeeId || "ALL"}
-              onChange={(event) => changeTarget(event.target.value)}
-              className="ml-auto rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="ALL">전체 직원</option>
-              {targetOptions.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name} ({employee.code})
-                </option>
-              ))}
-            </select>
-          )}
         </div>
 
         {error && (
@@ -237,7 +189,7 @@ export default function RecordsPage() {
 
       {!records ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white py-16 text-center text-slate-400">
-          직원과 PIN을 입력한 뒤 기록을 조회하세요.
+          직원을 선택한 뒤 기록을 조회하세요.
         </div>
       ) : (
         <div className="flex flex-col gap-6">
@@ -265,12 +217,14 @@ export default function RecordsPage() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[620px] text-sm">
+                <table className="w-full min-w-[920px] text-sm">
                   <thead className="bg-white text-left text-slate-500">
                     <tr>
                       <th className="px-4 py-3 font-medium">일자</th>
                       <th className="px-4 py-3 font-medium">출근</th>
                       <th className="px-4 py-3 font-medium">퇴근</th>
+                      <th className="px-4 py-3 font-medium">출근 위치</th>
+                      <th className="px-4 py-3 font-medium">퇴근 위치</th>
                       <th className="px-4 py-3 font-medium">근무시간</th>
                       <th className="px-4 py-3 font-medium">상태</th>
                     </tr>
@@ -290,6 +244,24 @@ export default function RecordsPage() {
                         <td className="px-4 py-3 font-mono text-slate-700">
                           {row.checkOut ?? "-"}
                         </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          <div>{row.checkInAddress}</div>
+                          {row.checkInLatitude !== null &&
+                          row.checkInLongitude !== null ? (
+                            <div className="mt-1 text-slate-400">
+                              {row.checkInLatitude.toFixed(6)} / {row.checkInLongitude.toFixed(6)}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          <div>{row.checkOutAddress}</div>
+                          {row.checkOutLatitude !== null &&
+                          row.checkOutLongitude !== null ? (
+                            <div className="mt-1 text-slate-400">
+                              {row.checkOutLatitude.toFixed(6)} / {row.checkOutLongitude.toFixed(6)}
+                            </div>
+                          ) : null}
+                        </td>
                         <td className="px-4 py-3 font-semibold text-slate-800">
                           {row.workTime}
                         </td>
@@ -307,7 +279,7 @@ export default function RecordsPage() {
                   </tbody>
                   <tfoot className="border-t border-slate-200 bg-slate-50">
                     <tr>
-                      <td className="px-4 py-3 font-bold" colSpan={3}>
+                      <td className="px-4 py-3 font-bold" colSpan={5}>
                         월 합산
                       </td>
                       <td className="px-4 py-3 font-bold text-emerald-700">

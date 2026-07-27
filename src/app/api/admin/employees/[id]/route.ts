@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/adminAuth";
-import { hashPin } from "@/lib/pin";
 
-function isValidPin(pin: unknown): pin is string {
-  return typeof pin === "string" && /^\d{4,6}$/.test(pin);
-}
-
-// 직원 정보 수정 (이름/부서/활성 상태, PIN 재설정)
+// 직원 정보 수정 (이름/부서/활성 상태)
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -21,7 +16,6 @@ export async function PATCH(
     name?: string;
     department?: string | null;
     active?: boolean;
-    pin?: string;
   };
   try {
     body = await req.json();
@@ -41,22 +35,12 @@ export async function PATCH(
     name?: string;
     department?: string | null;
     active?: boolean;
-    pinHash?: string;
   } = {};
   if (typeof body.name === "string" && body.name.trim())
     data.name = body.name.trim();
   if (body.department !== undefined)
     data.department = body.department?.trim() || null;
   if (typeof body.active === "boolean") data.active = body.active;
-  if (body.pin !== undefined) {
-    if (!isValidPin(body.pin)) {
-      return NextResponse.json(
-        { error: "PIN은 4~6자리 숫자여야 합니다." },
-        { status: 400 },
-      );
-    }
-    data.pinHash = hashPin(body.pin);
-  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json(

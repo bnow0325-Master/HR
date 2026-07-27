@@ -10,7 +10,6 @@ type Employee = {
   name: string;
   department: string | null;
   active: boolean;
-  hasPin: boolean;
 };
 
 export default function EmployeesAdminPage() {
@@ -23,7 +22,6 @@ export default function EmployeesAdminPage() {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
-  const [pin, setPin] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,7 +49,7 @@ export default function EmployeesAdminPage() {
     const res = await fetch("/api/admin/employees", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, name, department, pin }),
+      body: JSON.stringify({ code, name, department }),
     });
     const data = await res.json();
     if (res.ok) {
@@ -59,24 +57,10 @@ export default function EmployeesAdminPage() {
       setCode("");
       setName("");
       setDepartment("");
-      setPin("");
       load();
     } else {
       flash(false, data.error ?? "추가에 실패했습니다.");
     }
-  }
-
-  async function resetPin(emp: Employee) {
-    const newPin = window.prompt(`${emp.name} 님의 새 PIN (4~6자리 숫자)`);
-    if (newPin === null) return;
-    const res = await fetch(`/api/admin/employees/${emp.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin: newPin }),
-    });
-    const data = await res.json();
-    flash(res.ok, res.ok ? "PIN을 변경했습니다." : data.error);
-    if (res.ok) load();
   }
 
   async function toggleActive(emp: Employee) {
@@ -108,7 +92,7 @@ export default function EmployeesAdminPage() {
         className="mb-6 rounded-xl border border-slate-200 bg-white p-4"
       >
         <div className="mb-3 text-sm font-medium text-slate-600">직원 추가</div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -126,13 +110,6 @@ export default function EmployeesAdminPage() {
             onChange={(e) => setDepartment(e.target.value)}
             placeholder="부서(선택)"
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          />
-          <input
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            placeholder="PIN(4~6자리)"
-            inputMode="numeric"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-widest"
           />
         </div>
         <button
@@ -168,7 +145,6 @@ export default function EmployeesAdminPage() {
                 <th className="px-4 py-3 font-medium">사번</th>
                 <th className="px-4 py-3 font-medium">이름</th>
                 <th className="px-4 py-3 font-medium">부서</th>
-                <th className="px-4 py-3 font-medium">PIN</th>
                 <th className="px-4 py-3 font-medium">상태</th>
                 <th className="px-4 py-3 font-medium">관리</th>
               </tr>
@@ -182,13 +158,6 @@ export default function EmployeesAdminPage() {
                     {e.department ?? "-"}
                   </td>
                   <td className="px-4 py-3">
-                    {e.hasPin ? (
-                      <span className="text-emerald-600">설정됨</span>
-                    ) : (
-                      <span className="text-red-500">미설정</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
                     {e.active ? (
                       <span className="text-slate-700">활성</span>
                     ) : (
@@ -197,12 +166,6 @@ export default function EmployeesAdminPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-3 text-xs">
-                      <button
-                        onClick={() => resetPin(e)}
-                        className="text-brand hover:underline"
-                      >
-                        PIN 변경
-                      </button>
                       <button
                         onClick={() => toggleActive(e)}
                         className="text-slate-500 hover:underline"

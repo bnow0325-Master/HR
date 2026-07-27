@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isWithinOffice } from "@/lib/location";
-import { verifyQrToken } from "@/lib/qr";
-import { verifyPin } from "@/lib/pin";
 
 type CheckBody = {
   employeeId?: string;
   type?: "IN" | "OUT";
-  pin?: string;
-  qrToken?: string;
   latitude?: number;
   longitude?: number;
+  address?: string;
 };
 
 // 출퇴근 기록 생성.
-// 검증 순서: 본인 PIN → 사무실 GPS 반경 → 동적 QR. 셋 다 통과해야 기록된다.
+// 검증 순서: 워크보드 로그인 사용자 매칭 → 현재 브라우저 위치.
 export async function POST(req: Request) {
   let body: CheckBody;
   try {
@@ -23,7 +20,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const { employeeId, type, pin, qrToken, latitude, longitude } = body;
+  const { employeeId, type, latitude, longitude } = body;
+  const address = body.address?.trim() || null;
 
   if (!employeeId || (type !== "IN" && type !== "OUT")) {
     return NextResponse.json(
@@ -42,21 +40,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // 0) 본인 PIN 검증
-  if (!pin) {
-    return NextResponse.json(
-      { error: "PIN을 입력해 주세요." },
-      { status: 401 },
-    );
-  }
-  if (!verifyPin(pin, employee.pinHash)) {
-    return NextResponse.json(
-      { error: "PIN이 올바르지 않습니다." },
-      { status: 401 },
-    );
-  }
-
-  // 1) GPS 검증
+  // 1) 위치 검증
   if (typeof latitude !== "number" || typeof longitude !== "number") {
     return NextResponse.json(
       { error: "위치 정보가 필요합니다. 위치 권한을 허용해 주세요." },
@@ -73,28 +57,28 @@ export async function POST(req: Request) {
     );
   }
 
-  // 2) 동적 QR 검증
-  if (!verifyQrToken(qrToken ?? "")) {
-    return NextResponse.json(
-      { error: "QR 코드가 유효하지 않습니다. 사무실 화면의 QR을 다시 스캔해 주세요." },
-      { status: 403 },
-    );
-  }
-
   const record = await prisma.attendanceRecord.create({
     data: {
       employeeId,
       type,
-      method: "QR",
+      method: "PC_LOCATION",
       verified: true,
       latitude,
       longitude,
+      note: address,
     },
   });
 
   return NextResponse.json({
     ok: true,
-    record: { id: record.id, type: record.type, timestamp: record.timestamp },
+    record: {
+      id: record.id,
+      type: record.type,
+      timestamp: record.timestamp,
+      latitude: record.latitude,
+      longitude: record.longitude,
+      address: record.note,
+    },
   });
 }
 

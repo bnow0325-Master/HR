@@ -36,7 +36,18 @@ export async function GET(req: Request) {
       hour12: false,
     }).format(d);
 
-  const header = ["사번", "이름", "부서", "구분", "시각", "방식", "현장확인"];
+  const header = [
+    "사번",
+    "이름",
+    "부서",
+    "구분",
+    "시각",
+    "방식",
+    "현장확인",
+    "위치주소",
+    "위도",
+    "경도",
+  ];
   const rows = records.map((r) =>
     [
       r.employee.code,
@@ -46,6 +57,9 @@ export async function GET(req: Request) {
       fmt(r.timestamp),
       r.method,
       r.verified ? "확인" : "미확인",
+      r.note ?? "",
+      r.latitude ?? "",
+      r.longitude ?? "",
     ]
       .map((v) => csvEscape(String(v)))
       .join(","),

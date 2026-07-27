@@ -28,6 +28,18 @@ function fmtTime(d: Date) {
   }).format(d);
 }
 
+function fmtCoordinate(value: number | null | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "-";
+  }
+
+  return value.toFixed(6);
+}
+
+function fmtAddress(value: string | null | undefined) {
+  return value?.trim() || "주소 없음";
+}
+
 export default async function AdminPage({
   searchParams,
 }: {
@@ -195,6 +207,9 @@ function TodayList({
     type: string;
     timestamp: Date;
     verified: boolean;
+    latitude: number | null;
+    longitude: number | null;
+    note: string | null;
     employee: { name: string; code: string; department: string | null };
   }[];
 }) {
@@ -214,6 +229,7 @@ function TodayList({
             <th className="px-4 py-3 font-medium">직원</th>
             <th className="px-4 py-3 font-medium">부서</th>
             <th className="px-4 py-3 font-medium">구분</th>
+            <th className="px-4 py-3 font-medium">위치</th>
             <th className="px-4 py-3 font-medium">확인</th>
           </tr>
         </thead>
@@ -241,9 +257,14 @@ function TodayList({
                   {r.type === "IN" ? "출근" : "퇴근"}
                 </span>
               </td>
+              <td className="px-4 py-3 text-xs text-slate-600">
+                <div>{fmtAddress(r.note)}</div>
+                <div>위도 {fmtCoordinate(r.latitude)}</div>
+                <div>경도 {fmtCoordinate(r.longitude)}</div>
+              </td>
               <td className="px-4 py-3">
                 {r.verified ? (
-                  <span className="text-emerald-600" title="PIN+GPS+QR 확인됨">
+                  <span className="text-emerald-600" title="위치 확인됨">
                     ✓ 현장확인
                   </span>
                 ) : (
