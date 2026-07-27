@@ -4,7 +4,7 @@ export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-8 px-6 py-12">
       <div className="text-center">
-        <h1 className="text-3xl font-bold">checkinout</h1>
+        <h1 className="text-3xl font-bold">출퇴근</h1>
         <p className="mt-2 text-slate-500">위치 기반 출퇴근 기록 시스템</p>
       </div>
 

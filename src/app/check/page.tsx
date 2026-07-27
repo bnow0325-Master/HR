@@ -32,6 +32,12 @@ type SubmitResult =
     }
   | { ok: false; message: string };
 
+type AttendanceStatus = {
+  loading: boolean;
+  checkedIn: boolean;
+  nextAction: "IN" | "OUT";
+};
+
 function formatDongAddress(raw: string) {
   const normalized = raw.replaceAll(",", " ").replace(/\s+/g, " ").trim();
   if (!normalized) return "주소를 확인하지 못했습니다.";
@@ -80,6 +86,11 @@ export default function CheckPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [employeeError, setEmployeeError] = useState("");
+  const [attendanceStatus, setAttendanceStatus] = useState<AttendanceStatus>({
+    loading: false,
+    checkedIn: false,
+    nextAction: "IN",
+  });
 
   const requestedEmployeeName = useMemo(
     () => searchParams.get("name")?.trim() ?? "",
@@ -182,6 +193,46 @@ export default function CheckPage() {
     }
   }, [employeeId, geo.status]);
 
+  useEffect(() => {
+    if (!employeeId) return;
+
+    let cancelled = false;
+
+    async function loadAttendanceStatus() {
+      setAttendanceStatus((current) => ({ ...current, loading: true }));
+      try {
+        const params = new URLSearchParams({
+          employeeId,
+          latest: "1",
+        });
+        const res = await fetch(`/api/attendance?${params}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (cancelled) return;
+
+        setAttendanceStatus({
+          loading: false,
+          checkedIn: Boolean(data.checkedIn),
+          nextAction: data.nextAction === "OUT" ? "OUT" : "IN",
+        });
+      } catch {
+        if (cancelled) return;
+        setAttendanceStatus({
+          loading: false,
+          checkedIn: false,
+          nextAction: "IN",
+        });
+      }
+    }
+
+    void loadAttendanceStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId]);
+
   async function submit(type: "IN" | "OUT") {
     setResult(null);
     if (!employeeId) {
@@ -215,6 +266,7 @@ export default function CheckPage() {
       });
       const data = await res.json();
       if (res.ok) {
+        const nextAction = type === "IN" ? "OUT" : "IN";
         setResult({
           ok: true,
           type,
@@ -227,6 +279,11 @@ export default function CheckPage() {
               ? formatDongAddress(data.record.address)
               : "주소를 확인하지 못했습니다.",
         });
+        setAttendanceStatus({
+          loading: false,
+          checkedIn: type === "IN",
+          nextAction,
+        });
       } else {
         setResult({ ok: false, message: data.error ?? "처리에 실패했습니다." });
       }
@@ -238,6 +295,14 @@ export default function CheckPage() {
   }
 
   const currentEmployee = employees.find((employee) => employee.id === employeeId) ?? null;
+  const canCheckIn =
+    !submitting &&
+    !attendanceStatus.loading &&
+    attendanceStatus.nextAction === "IN";
+  const canCheckOut =
+    !submitting &&
+    !attendanceStatus.loading &&
+    attendanceStatus.nextAction === "OUT";
 
   return (
     <main className="mx-auto flex min-h-full max-w-md flex-col gap-5 px-6 py-8">
@@ -275,19 +340,27 @@ export default function CheckPage() {
       {/* 출근 / 퇴근 버튼 */}
       <div className="mt-2 grid grid-cols-2 gap-3">
         <button
-          disabled={submitting}
+          disabled={!canCheckIn}
           onClick={() => submit("IN")}
           className="rounded-xl bg-brand px-6 py-5 text-lg font-bold text-white shadow-sm transition hover:bg-brand-dark disabled:opacity-50"
         >
           출근
         </button>
         <button
-          disabled={submitting}
+          disabled={!canCheckOut}
           onClick={() => submit("OUT")}
           className="rounded-xl bg-slate-700 px-6 py-5 text-lg font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
         >
           퇴근
         </button>
+      </div>
+
+      <div className="text-center text-sm text-slate-500">
+        {attendanceStatus.loading
+          ? "현재 출퇴근 상태를 확인하는 중입니다."
+          : attendanceStatus.checkedIn
+            ? "이미 출근 상태입니다. 퇴근 버튼만 사용할 수 있습니다."
+            : "출근 버튼을 눌러 근무를 시작할 수 있습니다."}
       </div>
 
       {result && (

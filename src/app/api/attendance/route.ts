@@ -10,6 +10,20 @@ type CheckBody = {
   address?: string;
 };
 
+async function findLatestRecord(employeeId: string) {
+  const records = await prisma.attendanceRecord.findMany({
+    where: { employeeId },
+    orderBy: { timestamp: "desc" },
+    take: 1,
+  });
+
+  return records[0] ?? null;
+}
+
+function nextActionFromLatest(latest: { type: string } | null) {
+  return latest?.type === "IN" ? "OUT" : "IN";
+}
+
 // 출퇴근 기록 생성.
 // 검증 순서: 워크보드 로그인 사용자 매칭 → 현재 브라우저 위치.
 export async function POST(req: Request) {
@@ -37,6 +51,20 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "직원을 찾을 수 없습니다." },
       { status: 404 },
+    );
+  }
+
+  const latest = await findLatestRecord(employeeId);
+  if (type === "IN" && latest?.type === "IN") {
+    return NextResponse.json(
+      { error: "이미 출근 상태입니다. 퇴근만 등록할 수 있습니다." },
+      { status: 409 },
+    );
+  }
+  if (type === "OUT" && latest?.type !== "IN") {
+    return NextResponse.json(
+      { error: "출근 기록이 있어야 퇴근할 수 있습니다." },
+      { status: 409 },
     );
   }
 
@@ -87,6 +115,16 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const date = searchParams.get("date");
   const employeeId = searchParams.get("employeeId");
+  const latestOnly = searchParams.get("latest") === "1";
+
+  if (latestOnly && employeeId) {
+    const latest = await findLatestRecord(employeeId);
+    return NextResponse.json({
+      latestRecord: latest,
+      checkedIn: latest?.type === "IN",
+      nextAction: nextActionFromLatest(latest),
+    });
+  }
 
   const where: Record<string, unknown> = {};
   if (employeeId) where.employeeId = employeeId;
