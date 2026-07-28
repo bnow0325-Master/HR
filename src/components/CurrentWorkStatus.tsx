@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 type AttendanceEvent = {
   type?: "IN" | "OUT";
   timestamp: string;
+  cancelledAt?: string | null;
 };
 
 type WorkStatus = {
@@ -48,6 +49,7 @@ function formatElapsed(milliseconds: number) {
 function summarizeToday(events: AttendanceEvent[]) {
   const today = kstDate(new Date());
   const todayEvents = events
+    .filter((event) => !event.cancelledAt)
     .map((event) => ({
       type: event.type,
       timestamp: new Date(event.timestamp),

@@ -153,6 +153,7 @@ export async function POST(req: Request) {
   const records = await prisma.attendanceRecord.findMany({
     where: {
       employeeId: requester.id,
+      cancelledAt: null,
       timestamp: { gte: start, lt: end },
     },
     select: {

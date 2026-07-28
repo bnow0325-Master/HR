@@ -58,7 +58,10 @@ export default async function AdminPage({
   const { start, end, label } = periodRange(period, now);
 
   const records = await prisma.attendanceRecord.findMany({
-    where: { timestamp: { gte: start, lte: end } },
+    where: {
+      cancelledAt: null,
+      timestamp: { gte: start, lte: end },
+    },
     include: {
       employee: { select: { name: true, code: true, department: true } },
     },

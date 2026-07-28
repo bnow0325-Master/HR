@@ -46,6 +46,7 @@ type DevelopmentRecord = {
   type: "IN" | "OUT";
   timestamp: string;
   address: string;
+  cancelledAt?: string | null;
 };
 
 const DEVELOPMENT_EMPLOYEE: Employee = {
@@ -140,6 +141,7 @@ function buildDevelopmentRecords(
 
   const grouped = new Map<string, DevelopmentRecord[]>();
   for (const record of storedRecords) {
+    if (record.cancelledAt) continue;
     const date = formatDate(new Date(record.timestamp));
     if (!date.startsWith(month)) continue;
     grouped.set(date, [...(grouped.get(date) ?? []), record]);

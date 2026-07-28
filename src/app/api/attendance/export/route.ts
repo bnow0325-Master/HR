@@ -18,7 +18,10 @@ export async function GET(req: Request) {
   const { start, end } = periodRange(period, new Date());
 
   const records = await prisma.attendanceRecord.findMany({
-    where: { timestamp: { gte: start, lte: end } },
+    where: {
+      cancelledAt: null,
+      timestamp: { gte: start, lte: end },
+    },
     include: {
       employee: { select: { name: true, code: true, department: true } },
     },

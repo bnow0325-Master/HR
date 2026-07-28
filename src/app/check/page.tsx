@@ -43,12 +43,16 @@ type AttendanceStatus = {
   checkedIn: boolean;
   completed: boolean;
   nextAction: "IN" | "OUT" | null;
+  checkoutAt: string | null;
+  cancelExpiresAt: string | null;
 };
 
 type DevelopmentAttendanceRecord = {
   type: "IN" | "OUT";
   timestamp: string;
   address: string;
+  cancelledAt?: string | null;
+  cancelNote?: string | null;
 };
 
 const DEVELOPMENT_EMPLOYEE: Employee = {
@@ -60,6 +64,7 @@ const DEVELOPMENT_EMPLOYEE: Employee = {
 
 const DEVELOPMENT_RECORDS_KEY = "checkinoutDevelopmentRecords";
 const DEVELOPMENT_EMPLOYEES_KEY = "checkinoutDevelopmentEmployees";
+const CHECKOUT_CANCEL_WINDOW_MS = 30 * 60 * 1000;
 
 function loadDevelopmentEmployees() {
   try {
@@ -143,8 +148,20 @@ function getTodayDevelopmentRecords(
 ) {
   const today = kstDateKey(now);
   return records.filter(
-    (record) => kstDateKey(new Date(record.timestamp)) === today,
+    (record) =>
+      !record.cancelledAt &&
+      kstDateKey(new Date(record.timestamp)) === today,
   );
+}
+
+function formatCancelRemaining(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+    2,
+    "0",
+  )}`;
 }
 
 function CheckPageContent() {
@@ -158,13 +175,17 @@ function CheckPageContent() {
   const [address, setAddress] = useState<AddressState>({ status: "idle" });
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
   const [employeeError, setEmployeeError] = useState("");
   const [attendanceStatus, setAttendanceStatus] = useState<AttendanceStatus>({
     loading: true,
     checkedIn: false,
     completed: false,
     nextAction: "IN",
+    checkoutAt: null,
+    cancelExpiresAt: null,
   });
+  const [cancelClock, setCancelClock] = useState(() => Date.now());
   const [statusRefreshKey, setStatusRefreshKey] = useState(0);
 
   const requestedEmployeeName = useMemo(
@@ -315,12 +336,22 @@ function CheckPageContent() {
       const hasCheckedOut = todayRecords.some(
         (record) => record.type === "OUT",
       );
+      const checkoutRecord =
+        [...todayRecords].reverse().find((record) => record.type === "OUT") ??
+        null;
       const completed = hasCheckedIn && hasCheckedOut;
       setAttendanceStatus({
         loading: false,
         checkedIn: hasCheckedIn && !hasCheckedOut,
         completed,
         nextAction: completed ? null : hasCheckedIn ? "OUT" : "IN",
+        checkoutAt: checkoutRecord?.timestamp ?? null,
+        cancelExpiresAt: checkoutRecord
+          ? new Date(
+              new Date(checkoutRecord.timestamp).getTime() +
+                CHECKOUT_CANCEL_WINDOW_MS,
+            ).toISOString()
+          : null,
       });
       return;
     }
@@ -350,6 +381,12 @@ function CheckPageContent() {
               : data.nextAction === "IN"
                 ? "IN"
                 : null,
+          checkoutAt:
+            typeof data.checkoutAt === "string" ? data.checkoutAt : null,
+          cancelExpiresAt:
+            typeof data.cancelExpiresAt === "string"
+              ? data.cancelExpiresAt
+              : null,
         });
       } catch {
         if (cancelled) return;
@@ -358,6 +395,8 @@ function CheckPageContent() {
           checkedIn: false,
           completed: false,
           nextAction: "IN",
+          checkoutAt: null,
+          cancelExpiresAt: null,
         });
       }
     }
@@ -369,8 +408,22 @@ function CheckPageContent() {
     };
   }, [employeeId, isDevelopment]);
 
+  useEffect(() => {
+    if (!attendanceStatus.completed || !attendanceStatus.cancelExpiresAt) {
+      return;
+    }
+
+    setCancelClock(Date.now());
+    const timer = window.setInterval(() => {
+      setCancelClock(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [attendanceStatus.cancelExpiresAt, attendanceStatus.completed]);
+
   async function submit(type: "IN" | "OUT") {
     setResult(null);
+    setActionMessage("");
 
     if (!employeeId) {
       setResult({
@@ -511,6 +564,13 @@ function CheckPageContent() {
           checkedIn: type === "IN",
           completed: type === "OUT",
           nextAction: type === "IN" ? "OUT" : null,
+          checkoutAt: type === "OUT" ? timestamp.toISOString() : null,
+          cancelExpiresAt:
+            type === "OUT"
+              ? new Date(
+                  timestamp.getTime() + CHECKOUT_CANCEL_WINDOW_MS,
+                ).toISOString()
+              : null,
         });
         setStatusRefreshKey((current) => current + 1);
         return;
@@ -550,6 +610,13 @@ function CheckPageContent() {
           checkedIn: recordedType === "IN",
           completed: recordedType === "OUT",
           nextAction: recordedType === "IN" ? "OUT" : null,
+          checkoutAt:
+            recordedType === "OUT" ? data.record.timestamp : null,
+          cancelExpiresAt:
+            recordedType === "OUT" &&
+            typeof data.cancelExpiresAt === "string"
+              ? data.cancelExpiresAt
+              : null,
         });
         setStatusRefreshKey((current) => current + 1);
       } else {
@@ -562,6 +629,107 @@ function CheckPageContent() {
       setResult({
         ok: false,
         message: "현재 위치를 확인하거나 출퇴근을 기록하지 못했습니다.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function cancelCheckout() {
+    setResult(null);
+    setActionMessage("");
+
+    if (!employeeId) {
+      setResult({
+        ok: false,
+        message: "워크보드 로그인 사용자 정보를 확인하지 못했습니다.",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      if (isDevelopment) {
+        const now = new Date();
+        const storedRecords = JSON.parse(
+          window.localStorage.getItem(DEVELOPMENT_RECORDS_KEY) ?? "[]",
+        ) as DevelopmentAttendanceRecord[];
+        const today = kstDateKey(now);
+        let checkoutIndex = -1;
+
+        for (let index = storedRecords.length - 1; index >= 0; index -= 1) {
+          const record = storedRecords[index];
+          if (
+            record.type === "OUT" &&
+            !record.cancelledAt &&
+            kstDateKey(new Date(record.timestamp)) === today
+          ) {
+            checkoutIndex = index;
+            break;
+          }
+        }
+
+        if (checkoutIndex < 0) {
+          setResult({ ok: false, message: "취소할 퇴근 기록이 없습니다." });
+          return;
+        }
+
+        const checkout = storedRecords[checkoutIndex];
+        const elapsed = now.getTime() - new Date(checkout.timestamp).getTime();
+        if (elapsed < 0 || elapsed > CHECKOUT_CANCEL_WINDOW_MS) {
+          setResult({
+            ok: false,
+            message: "퇴근 후 30분 이내에만 취소할 수 있습니다.",
+          });
+          return;
+        }
+
+        storedRecords[checkoutIndex] = {
+          ...checkout,
+          cancelledAt: now.toISOString(),
+          cancelNote: "EMPLOYEE_UNDO_WITHIN_30_MINUTES",
+        };
+        window.localStorage.setItem(
+          DEVELOPMENT_RECORDS_KEY,
+          JSON.stringify(storedRecords.slice(-100)),
+        );
+      } else {
+        const response = await fetch("/api/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            employeeId,
+            action: "CANCEL_OUT",
+          }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          setResult({
+            ok: false,
+            message: data.error ?? "퇴근 취소에 실패했습니다.",
+          });
+          return;
+        }
+      }
+
+      setAttendanceStatus({
+        loading: false,
+        checkedIn: true,
+        completed: false,
+        nextAction: "OUT",
+        checkoutAt: null,
+        cancelExpiresAt: null,
+      });
+      setActionMessage(
+        "퇴근 취소가 완료되었습니다. 기존 출근시간부터 다시 근무 중입니다.",
+      );
+      setStatusRefreshKey((current) => current + 1);
+    } catch {
+      setResult({
+        ok: false,
+        message: "퇴근 취소 처리 중 문제가 발생했습니다.",
       });
     } finally {
       setSubmitting(false);
@@ -584,6 +752,17 @@ function CheckPageContent() {
     attendanceStatus.checkedIn &&
     !attendanceStatus.completed &&
     attendanceStatus.nextAction === "OUT";
+  const cancelRemainingMs = attendanceStatus.cancelExpiresAt
+    ? Math.max(
+        0,
+        new Date(attendanceStatus.cancelExpiresAt).getTime() - cancelClock,
+      )
+    : 0;
+  const canCancelCheckout =
+    !attendanceStatus.loading &&
+    !submitting &&
+    attendanceStatus.completed &&
+    cancelRemainingMs > 0;
 
   return (
     <main className="mx-auto flex min-h-full max-w-md flex-col gap-5 px-6 py-8">
@@ -642,6 +821,32 @@ function CheckPageContent() {
               ? "근무 중입니다. 퇴근할 때 퇴근 버튼을 눌러 주세요."
               : "출근 전입니다. 출근 버튼을 눌러 주세요."}
       </div>
+
+      {canCancelCheckout && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-center">
+          <button
+            type="button"
+            onClick={cancelCheckout}
+            disabled={submitting}
+            data-testid="cancel-checkout-button"
+            className="w-full rounded-lg border border-amber-400 bg-white px-4 py-3 font-bold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            퇴근 취소
+            <span className="ml-2 font-mono tabular-nums">
+              {formatCancelRemaining(cancelRemainingMs)}
+            </span>
+          </button>
+          <p className="mt-2 text-xs font-medium text-amber-700">
+            퇴근 등록 후 30분 이내에만 취소할 수 있습니다.
+          </p>
+        </div>
+      )}
+
+      {actionMessage && (
+        <div className="rounded-lg bg-emerald-50 px-4 py-3 text-center text-sm font-semibold text-emerald-700">
+          {actionMessage}
+        </div>
+      )}
 
       {result &&
         (result.ok ? (

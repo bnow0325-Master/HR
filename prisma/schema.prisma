@@ -33,19 +33,22 @@ model Employee {
 }
 
 model AttendanceRecord {
-  id         String   @id @default(cuid())
-  employee   Employee @relation(fields: [employeeId], references: [id])
-  employeeId String
-  type       String
-  timestamp  DateTime @default(now())
-  method     String   @default("MANUAL")
-  verified   Boolean  @default(false)
-  latitude   Float?
-  longitude  Float?
-  note       String?
-  createdAt  DateTime @default(now())
+  id          String    @id @default(cuid())
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  employeeId  String
+  type        String
+  timestamp   DateTime  @default(now())
+  method      String    @default("MANUAL")
+  verified    Boolean   @default(false)
+  latitude    Float?
+  longitude   Float?
+  note        String?
+  cancelledAt DateTime?
+  cancelNote  String?
+  createdAt   DateTime  @default(now())
 
   @@index([employeeId, timestamp])
+  @@index([employeeId, cancelledAt, timestamp])
 }
 
 model LeaveRequest {
