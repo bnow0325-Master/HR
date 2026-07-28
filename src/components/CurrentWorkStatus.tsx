@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 
 type AttendanceEvent = {
+  type?: "IN" | "OUT";
   timestamp: string;
 };
 
 type WorkStatus = {
   checkIn: Date;
+  checkOut: Date | null;
 };
 
 const DEVELOPMENT_EMPLOYEE_ID = "development-chu-dong-hyeon";
@@ -46,17 +48,36 @@ function formatElapsed(milliseconds: number) {
 function summarizeToday(events: AttendanceEvent[]) {
   const today = kstDate(new Date());
   const todayEvents = events
-    .map((event) => new Date(event.timestamp))
+    .map((event) => ({
+      type: event.type,
+      timestamp: new Date(event.timestamp),
+    }))
     .filter(
-      (timestamp) =>
-        !Number.isNaN(timestamp.getTime()) && kstDate(timestamp) === today,
+      (event) =>
+        !Number.isNaN(event.timestamp.getTime()) &&
+        kstDate(event.timestamp) === today,
     )
-    .sort((left, right) => left.getTime() - right.getTime());
+    .sort(
+      (left, right) =>
+        left.timestamp.getTime() - right.timestamp.getTime(),
+    );
 
   if (todayEvents.length === 0) return null;
 
+  const checkIn =
+    todayEvents.find((event) => event.type === "IN") ?? todayEvents[0];
+  const checkOut =
+    [...todayEvents]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "OUT" &&
+          event.timestamp.getTime() >= checkIn.timestamp.getTime(),
+      ) ?? null;
+
   return {
-    checkIn: todayEvents[0],
+    checkIn: checkIn.timestamp,
+    checkOut: checkOut?.timestamp ?? null,
   };
 }
 
@@ -104,7 +125,7 @@ export default function CurrentWorkStatus({
   }, [isDevelopment, refreshKey]);
 
   useEffect(() => {
-    if (!status) return;
+    if (!status || status.checkOut) return;
 
     const timer = window.setInterval(() => {
       setNow(new Date());
@@ -115,10 +136,16 @@ export default function CurrentWorkStatus({
 
   if (!status) return null;
 
-  const elapsed = formatElapsed(now.getTime() - status.checkIn.getTime());
+  const elapsedUntil = status.checkOut ?? now;
+  const elapsed = formatElapsed(
+    elapsedUntil.getTime() - status.checkIn.getTime(),
+  );
 
   return (
-    <section className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white px-5 py-5 shadow-sm">
+    <section
+      data-testid="current-work-status"
+      className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white px-5 py-5 shadow-sm"
+    >
       <div className="flex items-end justify-between gap-4">
         <div>
           <div className="text-xs font-semibold tracking-wide text-blue-600">
@@ -129,7 +156,10 @@ export default function CurrentWorkStatus({
           </div>
         </div>
         <div className="text-right">
-          <div className="font-mono text-3xl font-bold tabular-nums text-blue-700">
+          <div
+            data-testid="elapsed-work-time"
+            className="font-mono text-3xl font-bold tabular-nums text-blue-700"
+          >
             {elapsed}
           </div>
           <div className="mt-1 text-sm font-semibold text-slate-500">

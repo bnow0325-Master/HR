@@ -395,27 +395,47 @@ function CheckPageContent() {
         currentAddress = address.status === "ready" ? address.address : "";
       } else {
         if (!("geolocation" in navigator)) {
-          setResult({
-            ok: false,
-            message: "이 기기에서는 위치 정보를 사용할 수 없습니다.",
-          });
-          return;
+          if (isDevelopment) {
+            currentAddress = "위치 확인 불가";
+          } else {
+            setResult({
+              ok: false,
+              message: "이 기기에서는 위치 정보를 사용할 수 없습니다.",
+            });
+            return;
+          }
+        } else {
+          try {
+            setGeo({ status: "loading" });
+            const position = await getCurrentPosition();
+
+            latitude = position.coords.latitude;
+            longitude = position.coords.longitude;
+
+            setGeo({
+              status: "ready",
+              lat: latitude,
+              lng: longitude,
+              accuracy: position.coords.accuracy,
+            });
+
+            currentAddress = await resolveAddress(latitude, longitude);
+          } catch {
+            if (!isDevelopment) {
+              throw new Error("location-unavailable");
+            }
+            setGeo({
+              status: "error",
+              message:
+                "로컬 개발 환경에서 위치를 확인하지 못했지만 출퇴근 기록은 사용할 수 있습니다.",
+            });
+            setAddress({
+              status: "error",
+              message: "위치 확인 불가",
+            });
+            currentAddress = "위치 확인 불가";
+          }
         }
-
-        setGeo({ status: "loading" });
-        const position = await getCurrentPosition();
-
-        latitude = position.coords.latitude;
-        longitude = position.coords.longitude;
-
-        setGeo({
-          status: "ready",
-          lat: latitude,
-          lng: longitude,
-          accuracy: position.coords.accuracy,
-        });
-
-        currentAddress = await resolveAddress(latitude, longitude);
       }
 
       if (isDevelopment) {
@@ -481,7 +501,9 @@ function CheckPageContent() {
             second: "2-digit",
           }),
           address: currentAddress
-            ? formatDongAddress(currentAddress)
+            ? currentAddress === "위치 확인 불가"
+              ? currentAddress
+              : formatDongAddress(currentAddress)
             : "주소를 확인하지 못했습니다.",
         });
         setAttendanceStatus({
@@ -591,6 +613,8 @@ function CheckPageContent() {
         )}
       </div>
 
+      <CurrentWorkStatus refreshKey={statusRefreshKey} />
+
       <div className="mt-2 grid grid-cols-2 gap-3">
         <button
           disabled={!canCheckIn}
@@ -656,10 +680,6 @@ function CheckPageContent() {
           <p className="mt-1 text-sm text-slate-500">
             오늘 근무시간과 출퇴근 기록을 확인할 수 있습니다.
           </p>
-        </div>
-
-        <div className="mt-4">
-          <CurrentWorkStatus refreshKey={statusRefreshKey} />
         </div>
 
         <div className="mt-4 flex flex-col gap-3">
