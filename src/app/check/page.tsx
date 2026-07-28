@@ -661,12 +661,6 @@ function CheckPageContent() {
               <div className="font-semibold text-slate-800">현재 접속위치</div>
               <div className="mt-1">{result.address}</div>
             </div>
-            <Link
-              href="/records"
-              className="mt-4 inline-flex rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark"
-            >
-              출퇴근 기록부 보기
-            </Link>
           </div>
         ) : (
           <div className="rounded-lg bg-red-50 px-4 py-3 text-center text-sm font-medium text-red-600">
