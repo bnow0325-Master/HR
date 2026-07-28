@@ -10,22 +10,29 @@ type CheckBody = {
   address?: string;
 };
 
-async function findLatestRecord(employeeId: string) {
-  const records = await prisma.attendanceRecord.findMany({
-    where: { employeeId },
-    orderBy: { timestamp: "desc" },
-    take: 1,
-  });
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
-  return records[0] ?? null;
+function currentKstDate() {
+  const now = new Date();
+  const kst = new Date(now.getTime() + KST_OFFSET_MS);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(
+    2,
+    "0",
+  )}-${String(kst.getUTCDate()).padStart(2, "0")}`;
 }
 
-function nextActionFromLatest(latest: { type: string } | null) {
-  return latest?.type === "IN" ? "OUT" : "IN";
+function kstDayRange(date: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const start = new Date(Date.UTC(year, monthIndex, day) - KST_OFFSET_MS);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start, end };
 }
 
-// 출퇴근 기록 생성.
-// 검증 순서: 워크보드 로그인 사용자 매칭 → 현재 브라우저 위치.
 export async function POST(req: Request) {
   let body: CheckBody;
   try {
@@ -47,34 +54,23 @@ export async function POST(req: Request) {
   const employee = await prisma.employee.findUnique({
     where: { id: employeeId },
   });
-  if (!employee || !employee.active) {
+  if (!employee || !employee.active || !employee.attendanceEnabled) {
     return NextResponse.json(
-      { error: "직원을 찾을 수 없습니다." },
-      { status: 404 },
+      { error: "출퇴근 사용 권한이 없습니다." },
+      { status: 403 },
     );
   }
 
-  const latest = await findLatestRecord(employeeId);
-  if (type === "IN" && latest?.type === "IN") {
-    return NextResponse.json(
-      { error: "이미 출근 상태입니다. 퇴근만 등록할 수 있습니다." },
-      { status: 409 },
-    );
-  }
-  if (type === "OUT" && latest?.type !== "IN") {
-    return NextResponse.json(
-      { error: "출근 기록이 있어야 퇴근할 수 있습니다." },
-      { status: 409 },
-    );
-  }
-
-  // 1) 위치 검증
   if (typeof latitude !== "number" || typeof longitude !== "number") {
     return NextResponse.json(
-      { error: "위치 정보가 필요합니다. 위치 권한을 허용해 주세요." },
+      {
+        error:
+          "위치 정보가 필요합니다. 브라우저에서 위치 권한을 허용해 주세요.",
+      },
       { status: 422 },
     );
   }
+
   const geo = isWithinOffice(latitude, longitude);
   if (!geo.ok) {
     return NextResponse.json(
@@ -82,6 +78,51 @@ export async function POST(req: Request) {
         error: `사무실에서 ${geo.distance}m 떨어져 있습니다. 사무실 안에서만 출퇴근할 수 있습니다.`,
       },
       { status: 403 },
+    );
+  }
+
+  const todayRange = kstDayRange(currentKstDate());
+  if (!todayRange) {
+    return NextResponse.json(
+      { error: "오늘 날짜를 확인하지 못했습니다." },
+      { status: 500 },
+    );
+  }
+
+  const todayRecords = await prisma.attendanceRecord.findMany({
+    where: {
+      employeeId,
+      timestamp: { gte: todayRange.start, lt: todayRange.end },
+    },
+    select: { type: true },
+    orderBy: { timestamp: "asc" },
+  });
+
+  const hasCheckedIn = todayRecords.some((record) => record.type === "IN");
+  const hasCheckedOut = todayRecords.some((record) => record.type === "OUT");
+
+  if (type === "IN" && hasCheckedIn) {
+    return NextResponse.json(
+      { error: "오늘 출근이 이미 등록되었습니다." },
+      { status: 409 },
+    );
+  }
+  if (type === "OUT" && !hasCheckedIn) {
+    return NextResponse.json(
+      { error: "출근을 먼저 등록해 주세요." },
+      { status: 409 },
+    );
+  }
+  if (type === "OUT" && hasCheckedOut) {
+    return NextResponse.json(
+      { error: "오늘 퇴근이 이미 등록되었습니다." },
+      { status: 409 },
+    );
+  }
+  if (hasCheckedOut) {
+    return NextResponse.json(
+      { error: "오늘 출퇴근 기록이 이미 완료되었습니다." },
+      { status: 409 },
     );
   }
 
@@ -110,7 +151,6 @@ export async function POST(req: Request) {
   });
 }
 
-// 기록 조회 (관리자/디버그용). ?date=YYYY-MM-DD, ?employeeId=
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const date = searchParams.get("date");
@@ -118,25 +158,53 @@ export async function GET(req: Request) {
   const latestOnly = searchParams.get("latest") === "1";
 
   if (latestOnly && employeeId) {
-    const latest = await findLatestRecord(employeeId);
+    const todayRange = kstDayRange(currentKstDate());
+    const todayRecords = todayRange
+      ? await prisma.attendanceRecord.findMany({
+          where: {
+            employeeId,
+            timestamp: { gte: todayRange.start, lt: todayRange.end },
+          },
+          orderBy: { timestamp: "asc" },
+        })
+      : [];
+
+    const hasCheckedIn = todayRecords.some(
+      (record) => record.type === "IN",
+    );
+    const hasCheckedOut = todayRecords.some(
+      (record) => record.type === "OUT",
+    );
+    const completed = hasCheckedIn && hasCheckedOut;
+
     return NextResponse.json({
-      latestRecord: latest,
-      checkedIn: latest?.type === "IN",
-      nextAction: nextActionFromLatest(latest),
+      latestRecord: todayRecords.at(-1) ?? null,
+      checkedIn: hasCheckedIn && !hasCheckedOut,
+      completed,
+      nextAction: completed ? null : hasCheckedIn ? "OUT" : "IN",
     });
   }
 
   const where: Record<string, unknown> = {};
   if (employeeId) where.employeeId = employeeId;
   if (date) {
-    const start = new Date(`${date}T00:00:00`);
-    const end = new Date(`${date}T23:59:59.999`);
-    where.timestamp = { gte: start, lte: end };
+    const range = kstDayRange(date);
+    if (!range) {
+      return NextResponse.json(
+        { error: "날짜 형식이 올바르지 않습니다." },
+        { status: 400 },
+      );
+    }
+    where.timestamp = { gte: range.start, lt: range.end };
   }
 
   const records = await prisma.attendanceRecord.findMany({
     where,
-    include: { employee: { select: { name: true, code: true, department: true } } },
+    include: {
+      employee: {
+        select: { name: true, code: true, department: true },
+      },
+    },
     orderBy: { timestamp: "desc" },
     take: 200,
   });

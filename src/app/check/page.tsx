@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import CurrentWorkStatus from "@/components/CurrentWorkStatus";
 
 type Employee = {
   id: string;
   code: string;
   name: string;
   department: string | null;
+};
+
+type DevelopmentEmployee = Employee & {
+  active?: boolean;
+  attendanceEnabled?: boolean;
 };
 
 type GeoState =
@@ -35,8 +41,43 @@ type SubmitResult =
 type AttendanceStatus = {
   loading: boolean;
   checkedIn: boolean;
-  nextAction: "IN" | "OUT";
+  completed: boolean;
+  nextAction: "IN" | "OUT" | null;
 };
+
+type DevelopmentAttendanceRecord = {
+  type: "IN" | "OUT";
+  timestamp: string;
+  address: string;
+};
+
+const DEVELOPMENT_EMPLOYEE: Employee = {
+  id: "development-chu-dong-hyeon",
+  code: "DEV",
+  name: "추동현",
+  department: "개발 사용자",
+};
+
+const DEVELOPMENT_RECORDS_KEY = "checkinoutDevelopmentRecords";
+const DEVELOPMENT_EMPLOYEES_KEY = "checkinoutDevelopmentEmployees";
+
+function loadDevelopmentEmployees() {
+  try {
+    const storedEmployees = JSON.parse(
+      window.localStorage.getItem(DEVELOPMENT_EMPLOYEES_KEY) ?? "[]",
+    ) as DevelopmentEmployee[];
+    const availableEmployees = storedEmployees.filter(
+      (employee) =>
+        employee.active !== false && employee.attendanceEnabled !== false,
+    );
+
+    return availableEmployees.length > 0
+      ? availableEmployees
+      : [DEVELOPMENT_EMPLOYEE];
+  } catch {
+    return [DEVELOPMENT_EMPLOYEE];
+  }
+}
 
 function formatDongAddress(raw: string) {
   const normalized = raw.replaceAll(",", " ").replace(/\s+/g, " ").trim();
@@ -52,18 +93,18 @@ function formatDongAddress(raw: string) {
           part.endsWith("광역시") ||
           part.endsWith("특별자치시") ||
           part.endsWith("특별자치도") ||
-          part.endsWith("도")
+          part.endsWith("대한민국")
         ),
     );
 
-  const district = parts.find((part) => /(구|군|시)$/.test(part)) ?? "";
+  const district = parts.find((part) => /(구|군)$/.test(part)) ?? "";
   const neighborhood =
     parts
       .map((part) => {
         const dongMatch = part.match(/^(.*(?:동|읍|면|리))(?:\d+가)?$/);
         if (dongMatch) return dongMatch[1];
 
-        const roadMatch = part.match(/^(.*동)(?:로|길).*$/);
+        const roadMatch = part.match(/^(.*(?:로|길)).*$/);
         if (roadMatch) return roadMatch[1];
 
         return "";
@@ -77,9 +118,41 @@ function formatDongAddress(raw: string) {
   return neighborhood || district || parts.slice(0, 2).join(" ");
 }
 
-export default function CheckPage() {
+function getCurrentPosition() {
+  return new Promise<GeolocationPosition>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    });
+  });
+}
+
+function kstDateKey(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Seoul",
+  }).format(date);
+}
+
+function getTodayDevelopmentRecords(
+  records: DevelopmentAttendanceRecord[],
+  now = new Date(),
+) {
+  const today = kstDateKey(now);
+  return records.filter(
+    (record) => kstDateKey(new Date(record.timestamp)) === today,
+  );
+}
+
+function CheckPageContent() {
   const searchParams = useSearchParams();
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const isDevelopment = process.env.NODE_ENV === "development";
+  const [employees, setEmployees] = useState<Employee[]>(
+    isDevelopment ? [DEVELOPMENT_EMPLOYEE] : [],
+  );
   const [employeeId, setEmployeeId] = useState("");
   const [geo, setGeo] = useState<GeoState>({ status: "idle" });
   const [address, setAddress] = useState<AddressState>({ status: "idle" });
@@ -87,27 +160,47 @@ export default function CheckPage() {
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [employeeError, setEmployeeError] = useState("");
   const [attendanceStatus, setAttendanceStatus] = useState<AttendanceStatus>({
-    loading: false,
+    loading: true,
     checkedIn: false,
+    completed: false,
     nextAction: "IN",
   });
+  const [statusRefreshKey, setStatusRefreshKey] = useState(0);
 
   const requestedEmployeeName = useMemo(
     () => searchParams.get("name")?.trim() ?? "",
     [searchParams],
   );
+  const developmentEmployeeName =
+    process.env.NODE_ENV === "development" ? "추동현" : "";
+  const effectiveEmployeeName =
+    requestedEmployeeName || developmentEmployeeName;
 
   useEffect(() => {
+    if (isDevelopment) {
+      setEmployees(loadDevelopmentEmployees());
+      return;
+    }
+
     fetch("/api/employees")
-      .then((r) => r.json())
-      .then((d) => setEmployees(d.employees ?? []))
-      .catch(() => setEmployees([]));
-  }, []);
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("직원 목록을 불러오지 못했습니다.");
+        }
+        return response.json();
+      })
+      .then((data) => {
+        setEmployees((data.employees ?? []) as Employee[]);
+      })
+      .catch(() => {
+        setEmployees([]);
+      });
+  }, [isDevelopment]);
 
   useEffect(() => {
     if (employees.length === 0) return;
 
-    if (!requestedEmployeeName) {
+    if (!effectiveEmployeeName) {
       if (!employeeId) {
         setEmployeeError(
           "워크보드 로그인 사용자 정보가 없어 직원을 자동으로 찾지 못했습니다.",
@@ -117,12 +210,12 @@ export default function CheckPage() {
     }
 
     const matched = employees.find(
-      (employee) => employee.name.trim() === requestedEmployeeName,
+      (employee) => employee.name.trim() === effectiveEmployeeName,
     );
 
     if (!matched) {
       setEmployeeError(
-        `워크보드 사용자 "${requestedEmployeeName}" 와 일치하는 직원을 찾지 못했습니다.`,
+        `워크보드 사용자 "${effectiveEmployeeName}" 와 일치하는 직원을 찾지 못했습니다.`,
       );
       return;
     }
@@ -131,7 +224,7 @@ export default function CheckPage() {
     setEmployeeError("");
     window.sessionStorage.setItem("workboardEmployeeName", matched.name);
     window.sessionStorage.setItem("workboardEmployeeId", matched.id);
-  }, [employeeId, employees, requestedEmployeeName]);
+  }, [effectiveEmployeeName, employeeId, employees]);
 
   async function resolveAddress(lat: number, lng: number) {
     setAddress({ status: "loading" });
@@ -140,48 +233,56 @@ export default function CheckPage() {
         lat: String(lat),
         lng: String(lng),
       });
-      const res = await fetch(`/api/location/address?${params}`, {
+      const response = await fetch(`/api/location/address?${params}`, {
         cache: "no-store",
       });
-      const data = await res.json();
-      if (!res.ok || !data.address) {
+      const data = await response.json();
+      if (!response.ok || !data.address) {
         setAddress({
           status: "error",
           message: data.error ?? "주소를 가져오지 못했습니다.",
         });
-        return;
+        return "";
       }
+
       setAddress({ status: "ready", address: data.address });
+      return data.address as string;
     } catch {
       setAddress({ status: "error", message: "주소를 가져오지 못했습니다." });
+      return "";
     }
   }
 
   function requestLocation() {
     if (!("geolocation" in navigator)) {
-      setGeo({ status: "error", message: "이 기기는 위치를 지원하지 않습니다." });
+      setGeo({
+        status: "error",
+        message: "이 기기에서는 위치 정보를 사용할 수 없습니다.",
+      });
       setAddress({ status: "idle" });
       return;
     }
+
     setGeo({ status: "loading" });
     setAddress({ status: "idle" });
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      (position) => {
         setGeo({
           status: "ready",
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
         });
-        void resolveAddress(pos.coords.latitude, pos.coords.longitude);
+        void resolveAddress(position.coords.latitude, position.coords.longitude);
       },
-      (err) => {
+      (error) => {
         setGeo({
           status: "error",
           message:
-            err.code === err.PERMISSION_DENIED
-              ? "위치 권한이 거부되었습니다. 출퇴근하려면 위치를 허용해 주세요."
-              : "위치를 가져오지 못했습니다.",
+            error.code === error.PERMISSION_DENIED
+              ? "위치 권한이 거부되었습니다. 브라우저에서 위치 권한을 허용해 주세요."
+              : "현재 위치를 가져오지 못했습니다.",
         });
         setAddress({ status: "idle" });
       },
@@ -198,6 +299,32 @@ export default function CheckPage() {
   useEffect(() => {
     if (!employeeId) return;
 
+    if (isDevelopment) {
+      let records: DevelopmentAttendanceRecord[] = [];
+      try {
+        records = JSON.parse(
+          window.localStorage.getItem(DEVELOPMENT_RECORDS_KEY) ?? "[]",
+        ) as DevelopmentAttendanceRecord[];
+      } catch {
+        records = [];
+      }
+      const todayRecords = getTodayDevelopmentRecords(records);
+      const hasCheckedIn = todayRecords.some(
+        (record) => record.type === "IN",
+      );
+      const hasCheckedOut = todayRecords.some(
+        (record) => record.type === "OUT",
+      );
+      const completed = hasCheckedIn && hasCheckedOut;
+      setAttendanceStatus({
+        loading: false,
+        checkedIn: hasCheckedIn && !hasCheckedOut,
+        completed,
+        nextAction: completed ? null : hasCheckedIn ? "OUT" : "IN",
+      });
+      return;
+    }
+
     let cancelled = false;
 
     async function loadAttendanceStatus() {
@@ -207,22 +334,29 @@ export default function CheckPage() {
           employeeId,
           latest: "1",
         });
-        const res = await fetch(`/api/attendance?${params}`, {
+        const response = await fetch(`/api/attendance?${params}`, {
           cache: "no-store",
         });
-        const data = await res.json();
+        const data = await response.json();
         if (cancelled) return;
 
         setAttendanceStatus({
           loading: false,
           checkedIn: Boolean(data.checkedIn),
-          nextAction: data.nextAction === "OUT" ? "OUT" : "IN",
+          completed: Boolean(data.completed),
+          nextAction:
+            data.nextAction === "OUT"
+              ? "OUT"
+              : data.nextAction === "IN"
+                ? "IN"
+                : null,
         });
       } catch {
         if (cancelled) return;
         setAttendanceStatus({
           loading: false,
           checkedIn: false,
+          completed: false,
           nextAction: "IN",
         });
       }
@@ -233,48 +367,156 @@ export default function CheckPage() {
     return () => {
       cancelled = true;
     };
-  }, [employeeId]);
+  }, [employeeId, isDevelopment]);
 
   async function submit(type: "IN" | "OUT") {
     setResult(null);
+
     if (!employeeId) {
       setResult({
         ok: false,
-        message: employeeError || "워크보드 로그인 사용자와 연결된 직원을 찾지 못했습니다.",
+        message:
+          employeeError ||
+          "워크보드 로그인 사용자와 연결된 직원을 찾지 못했습니다.",
       });
-      return;
-    }
-    if (geo.status === "loading") {
-      setResult({ ok: false, message: "현재 위치를 확인 중입니다. 잠시 후 다시 시도해 주세요." });
-      return;
-    }
-    if (geo.status !== "ready") {
-      setResult({ ok: false, message: "현재 접속 위치를 확인하지 못했습니다." });
       return;
     }
 
     setSubmitting(true);
+
     try {
-      const res = await fetch("/api/attendance", {
+      let latitude = 0;
+      let longitude = 0;
+      let currentAddress = "";
+
+      if (geo.status === "ready") {
+        latitude = geo.lat;
+        longitude = geo.lng;
+        currentAddress = address.status === "ready" ? address.address : "";
+      } else {
+        if (!("geolocation" in navigator)) {
+          setResult({
+            ok: false,
+            message: "이 기기에서는 위치 정보를 사용할 수 없습니다.",
+          });
+          return;
+        }
+
+        setGeo({ status: "loading" });
+        const position = await getCurrentPosition();
+
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+
+        setGeo({
+          status: "ready",
+          lat: latitude,
+          lng: longitude,
+          accuracy: position.coords.accuracy,
+        });
+
+        currentAddress = await resolveAddress(latitude, longitude);
+      }
+
+      if (isDevelopment) {
+        const timestamp = new Date();
+        const storedRecords = JSON.parse(
+          window.localStorage.getItem(DEVELOPMENT_RECORDS_KEY) ?? "[]",
+        ) as DevelopmentAttendanceRecord[];
+        const todayRecords = getTodayDevelopmentRecords(
+          storedRecords,
+          timestamp,
+        );
+        const hasCheckedIn = todayRecords.some(
+          (record) => record.type === "IN",
+        );
+        const hasCheckedOut = todayRecords.some(
+          (record) => record.type === "OUT",
+        );
+
+        if (type === "IN" && hasCheckedIn) {
+          setResult({
+            ok: false,
+            message: "오늘 출근이 이미 등록되었습니다.",
+          });
+          return;
+        }
+        if (type === "OUT" && !hasCheckedIn) {
+          setResult({
+            ok: false,
+            message: "출근을 먼저 등록해 주세요.",
+          });
+          return;
+        }
+        if (type === "OUT" && hasCheckedOut) {
+          setResult({
+            ok: false,
+            message: "오늘 퇴근이 이미 등록되었습니다.",
+          });
+          return;
+        }
+        if (hasCheckedOut) {
+          setResult({
+            ok: false,
+            message: "오늘 출퇴근 기록이 이미 완료되었습니다.",
+          });
+          return;
+        }
+
+        storedRecords.push({
+          type,
+          timestamp: timestamp.toISOString(),
+          address: currentAddress,
+        });
+        window.localStorage.setItem(
+          DEVELOPMENT_RECORDS_KEY,
+          JSON.stringify(storedRecords.slice(-100)),
+        );
+        setResult({
+          ok: true,
+          type,
+          time: timestamp.toLocaleTimeString("ko-KR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
+          address: currentAddress
+            ? formatDongAddress(currentAddress)
+            : "주소를 확인하지 못했습니다.",
+        });
+        setAttendanceStatus({
+          loading: false,
+          checkedIn: type === "IN",
+          completed: type === "OUT",
+          nextAction: type === "IN" ? "OUT" : null,
+        });
+        setStatusRefreshKey((current) => current + 1);
+        return;
+      }
+
+      const response = await fetch("/api/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employeeId,
           type,
-          latitude: geo.lat,
-          longitude: geo.lng,
-          address: address.status === "ready" ? address.address : "",
+          latitude,
+          longitude,
+          address: currentAddress,
         }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        const nextAction = type === "IN" ? "OUT" : "IN";
+      const data = await response.json();
+
+      if (response.ok) {
+        const recordedType: "IN" | "OUT" =
+          data.record.type === "OUT" ? "OUT" : "IN";
         setResult({
           ok: true,
-          type,
+          type: recordedType,
           time: new Date(data.record.timestamp).toLocaleTimeString("ko-KR", {
             hour: "2-digit",
             minute: "2-digit",
+            second: "2-digit",
           }),
           address:
             typeof data.record.address === "string" && data.record.address
@@ -283,59 +525,51 @@ export default function CheckPage() {
         });
         setAttendanceStatus({
           loading: false,
-          checkedIn: type === "IN",
-          nextAction,
+          checkedIn: recordedType === "IN",
+          completed: recordedType === "OUT",
+          nextAction: recordedType === "IN" ? "OUT" : null,
         });
+        setStatusRefreshKey((current) => current + 1);
       } else {
-        setResult({ ok: false, message: data.error ?? "처리에 실패했습니다." });
+        setResult({
+          ok: false,
+          message: data.error ?? "처리에 실패했습니다.",
+        });
       }
     } catch {
-      setResult({ ok: false, message: "네트워크 오류가 발생했습니다." });
+      setResult({
+        ok: false,
+        message: "현재 위치를 확인하거나 출퇴근을 기록하지 못했습니다.",
+      });
     } finally {
       setSubmitting(false);
     }
   }
 
-  const currentEmployee = employees.find((employee) => employee.id === employeeId) ?? null;
+  const currentEmployee =
+    employees.find((employee) => employee.id === employeeId) ?? null;
   const canCheckIn =
-    !submitting &&
     !attendanceStatus.loading &&
-    geo.status === "ready" &&
+    !submitting &&
+    !!employeeId &&
+    !attendanceStatus.checkedIn &&
+    !attendanceStatus.completed &&
     attendanceStatus.nextAction === "IN";
   const canCheckOut =
-    !submitting &&
     !attendanceStatus.loading &&
-    geo.status === "ready" &&
+    !submitting &&
+    !!employeeId &&
+    attendanceStatus.checkedIn &&
+    !attendanceStatus.completed &&
     attendanceStatus.nextAction === "OUT";
-
-  const statusMessage = employeeError
-    ? employeeError
-    : geo.status === "loading"
-      ? "현재 위치를 확인하는 중입니다. 잠시만 기다려 주세요."
-      : geo.status === "error"
-        ? geo.message
-        : geo.status === "idle"
-          ? "현재 위치 확인을 준비하고 있습니다."
-          : attendanceStatus.loading
-            ? "현재 출퇴근 상태를 확인하는 중입니다."
-            : attendanceStatus.checkedIn
-              ? "이미 출근 상태입니다. 퇴근 버튼만 사용할 수 있습니다."
-              : "위치 확인이 완료되었습니다. 출근 버튼을 누를 수 있습니다.";
-  const statusTone =
-    employeeError || geo.status === "error" ? "text-red-600" : "text-slate-500";
 
   return (
     <main className="mx-auto flex min-h-full max-w-md flex-col gap-5 px-6 py-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">출퇴근</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            워크보드 로그인 사용자 기준으로 직원 정보를 자동 불러오고 현재 위치를 바로 기록합니다.
-          </p>
-        </div>
-        <Link href="/" className="text-sm text-slate-400 hover:text-slate-600">
-          홈
-        </Link>
+      <div>
+        <h1 className="text-2xl font-bold">출퇴근</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          출근과 퇴근을 등록하고 오늘의 근무 현황을 확인합니다.
+        </p>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -344,7 +578,7 @@ export default function CheckPage() {
           <div className="font-semibold text-slate-800">
             {currentEmployee
               ? `${currentEmployee.name} (${currentEmployee.code})`
-              : requestedEmployeeName || "사용자 정보 없음"}
+              : effectiveEmployeeName || "사용자 정보 없음"}
           </div>
           <div className="mt-1 text-slate-500">
             {currentEmployee?.department ?? "부서 정보 없음"}
@@ -357,30 +591,36 @@ export default function CheckPage() {
         )}
       </div>
 
-      {/* 출근 / 퇴근 버튼 */}
       <div className="mt-2 grid grid-cols-2 gap-3">
         <button
           disabled={!canCheckIn}
           onClick={() => submit("IN")}
           className="rounded-xl bg-brand px-6 py-5 text-lg font-bold text-white shadow-sm transition hover:bg-brand-dark disabled:opacity-50"
         >
-          출근
+          {attendanceStatus.checkedIn || attendanceStatus.completed
+            ? "출근 완료"
+            : "출근"}
         </button>
         <button
           disabled={!canCheckOut}
           onClick={() => submit("OUT")}
           className="rounded-xl bg-slate-700 px-6 py-5 text-lg font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
         >
-          퇴근
+          {attendanceStatus.completed ? "퇴근 완료" : "퇴근"}
         </button>
       </div>
-
-      <div className={`text-center text-sm ${statusTone}`}>
-        {statusMessage}
+      <div className="text-center text-sm font-medium text-slate-500">
+        {attendanceStatus.loading
+          ? "오늘 출퇴근 상태를 확인하고 있습니다."
+          : attendanceStatus.completed
+            ? "오늘 출근과 퇴근 등록이 완료되었습니다."
+            : attendanceStatus.checkedIn
+              ? "근무 중입니다. 퇴근할 때 퇴근 버튼을 눌러 주세요."
+              : "출근 전입니다. 출근 버튼을 눌러 주세요."}
       </div>
 
-      {result && (
-        result.ok ? (
+      {result &&
+        (result.ok ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-5 text-center shadow-sm">
             <div className="text-xl font-bold text-emerald-700">
               {result.type === "IN"
@@ -390,23 +630,67 @@ export default function CheckPage() {
             <div className="mt-2 text-3xl font-bold text-slate-900">
               {result.time}
             </div>
+            <div className="mt-1 text-sm font-semibold text-slate-500">
+              {result.type === "IN" ? "출근시간" : "퇴근시간"}
+            </div>
             <div className="mt-4 rounded-lg bg-white/80 px-4 py-3 text-left text-sm text-slate-700">
-              <div className="font-semibold text-slate-800">기록 위치</div>
+              <div className="font-semibold text-slate-800">현재 접속위치</div>
               <div className="mt-1">{result.address}</div>
             </div>
             <Link
-              href="/"
+              href="/records"
               className="mt-4 inline-flex rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark"
             >
-              메인으로 가기
+              출퇴근 기록부 보기
             </Link>
           </div>
         ) : (
           <div className="rounded-lg bg-red-50 px-4 py-3 text-center text-sm font-medium text-red-600">
             {result.message}
           </div>
-        )
-      )}
+        ))}
+
+      <section className="mt-5">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">출퇴근 관리</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            오늘 근무시간과 출퇴근 기록을 확인할 수 있습니다.
+          </p>
+        </div>
+
+        <div className="mt-4">
+          <CurrentWorkStatus refreshKey={statusRefreshKey} />
+        </div>
+
+        <div className="mt-4 flex flex-col gap-3">
+          <Link
+            href="/records"
+            className="rounded-xl border border-slate-300 bg-white px-6 py-4 text-center font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            출퇴근 기록부
+          </Link>
+          <Link
+            href="/admin"
+            className="rounded-xl border border-slate-300 bg-white px-6 py-4 text-center font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            관리자 · 기록 보기
+          </Link>
+        </div>
+      </section>
     </main>
+  );
+}
+
+export default function CheckPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto flex min-h-full max-w-md items-center justify-center px-6 py-8 text-sm text-slate-500">
+          출퇴근 화면을 불러오는 중입니다.
+        </main>
+      }
+    >
+      <CheckPageContent />
+    </Suspense>
   );
 }

@@ -80,56 +80,31 @@ function summarizeDay(records: RecordLite[]) {
   const sorted = [...records].sort(
     (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
   );
-  let firstIn: Date | null = null;
-  let lastOut: Date | null = null;
-  let firstInAddress: string | null = null;
-  let lastOutAddress: string | null = null;
-  let firstInLatitude: number | null = null;
-  let firstInLongitude: number | null = null;
-  let lastOutLatitude: number | null = null;
-  let lastOutLongitude: number | null = null;
-  let pendingIn: Date | null = null;
-  let totalMinutes = 0;
-  let open = false;
-
-  for (const record of sorted) {
-    if (record.type === "IN") {
-      if (!firstIn) {
-        firstIn = record.timestamp;
-        firstInAddress = record.note;
-        firstInLatitude = record.latitude;
-        firstInLongitude = record.longitude;
-      }
-      pendingIn = record.timestamp;
-      open = true;
-    }
-    if (record.type === "OUT") {
-      lastOut = record.timestamp;
-      lastOutAddress = record.note;
-      lastOutLatitude = record.latitude;
-      lastOutLongitude = record.longitude;
-      if (pendingIn) {
-        const minutes = Math.round(
-          (record.timestamp.getTime() - pendingIn.getTime()) / 60000,
-        );
-        if (minutes > 0) totalMinutes += minutes;
-        pendingIn = null;
-        open = false;
-      }
-    }
-  }
+  const firstRecord = sorted[0] ?? null;
+  const lastRecord = sorted.length > 1 ? sorted.at(-1) ?? null : null;
+  const totalMinutes =
+    firstRecord && lastRecord
+      ? Math.max(
+          0,
+          Math.round(
+            (lastRecord.timestamp.getTime() -
+              firstRecord.timestamp.getTime()) /
+              60000,
+          ),
+        )
+      : 0;
 
   return {
-    firstIn,
-    lastOut,
-    firstInAddress,
-    lastOutAddress,
-    firstInLatitude,
-    firstInLongitude,
-    lastOutLatitude,
-    lastOutLongitude,
+    firstIn: firstRecord?.timestamp ?? null,
+    lastOut: lastRecord?.timestamp ?? null,
+    firstInAddress: firstRecord?.note ?? null,
+    lastOutAddress: lastRecord?.note ?? null,
+    firstInLatitude: firstRecord?.latitude ?? null,
+    firstInLongitude: firstRecord?.longitude ?? null,
+    lastOutLatitude: lastRecord?.latitude ?? null,
+    lastOutLongitude: lastRecord?.longitude ?? null,
     totalMinutes,
-    open,
+    open: sorted.length === 1,
   };
 }
 

@@ -1,178 +1,820 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 type Employee = {
   id: string;
   code: string;
   name: string;
   department: string | null;
+  position: string | null;
+  email: string | null;
+  phone: string | null;
+  hireDate: string | null;
+  terminationDate: string | null;
+  workMinutesPerDay: number;
+  systemRole: "ADMIN" | "MEMBER";
+  attendanceEnabled: boolean;
+  leaveEnabled: boolean;
+  workboardEnabled: boolean;
   active: boolean;
 };
 
+type EmployeeDraft = {
+  code: string;
+  name: string;
+  department: string;
+  position: string;
+  email: string;
+  phone: string;
+  hireDate: string;
+  terminationDate: string;
+  workHoursPerDay: string;
+  systemRole: "ADMIN" | "MEMBER";
+  attendanceEnabled: boolean;
+  leaveEnabled: boolean;
+  workboardEnabled: boolean;
+};
+
+const DEVELOPMENT_EMPLOYEES_KEY = "checkinoutDevelopmentEmployees";
+const DEVELOPMENT_EMPLOYEE: Employee = {
+  id: "development-chu-dong-hyeon",
+  code: "DEV",
+  name: "추동현",
+  department: "개발 사용자",
+  position: "개발",
+  email: null,
+  phone: null,
+  hireDate: "2024-01-01",
+  terminationDate: null,
+  workMinutesPerDay: 480,
+  systemRole: "ADMIN",
+  attendanceEnabled: true,
+  leaveEnabled: true,
+  workboardEnabled: false,
+  active: true,
+};
+
+const EMPTY_DRAFT: EmployeeDraft = {
+  code: "",
+  name: "",
+  department: "",
+  position: "",
+  email: "",
+  phone: "",
+  hireDate: "",
+  terminationDate: "",
+  workHoursPerDay: "8",
+  systemRole: "MEMBER",
+  attendanceEnabled: true,
+  leaveEnabled: true,
+  workboardEnabled: true,
+};
+
+function normalizeEmployee(employee: Partial<Employee>): Employee {
+  const active = employee.active !== false && !employee.terminationDate;
+
+  return {
+    id: employee.id ?? `development-${Date.now()}`,
+    code: employee.code ?? "",
+    name: employee.name ?? "",
+    department: employee.department ?? null,
+    position: employee.position ?? null,
+    email: employee.email ?? null,
+    phone: employee.phone ?? null,
+    hireDate: employee.hireDate ?? null,
+    terminationDate: employee.terminationDate ?? null,
+    workMinutesPerDay: employee.workMinutesPerDay ?? 480,
+    systemRole: employee.systemRole === "ADMIN" ? "ADMIN" : "MEMBER",
+    attendanceEnabled: active && employee.attendanceEnabled !== false,
+    leaveEnabled: active && employee.leaveEnabled !== false,
+    workboardEnabled:
+      active &&
+      Boolean(employee.email) &&
+      employee.workboardEnabled !== false,
+    active,
+  };
+}
+
+function readDevelopmentEmployees() {
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(DEVELOPMENT_EMPLOYEES_KEY) ?? "[]",
+    ) as Partial<Employee>[];
+    return stored.length > 0
+      ? stored.map(normalizeEmployee)
+      : [DEVELOPMENT_EMPLOYEE];
+  } catch {
+    return [DEVELOPMENT_EMPLOYEE];
+  }
+}
+
+function saveDevelopmentEmployees(employees: Employee[]) {
+  window.localStorage.setItem(
+    DEVELOPMENT_EMPLOYEES_KEY,
+    JSON.stringify(employees),
+  );
+}
+
+function dateValue(value: string | null) {
+  return value ? value.slice(0, 10) : "";
+}
+
+function displayDate(value: string | null) {
+  return value ? value.slice(0, 10).replaceAll("-", ".") : "-";
+}
+
+function draftFromEmployee(employee: Employee): EmployeeDraft {
+  return {
+    code: employee.code,
+    name: employee.name,
+    department: employee.department ?? "",
+    position: employee.position ?? "",
+    email: employee.email ?? "",
+    phone: employee.phone ?? "",
+    hireDate: dateValue(employee.hireDate),
+    terminationDate: dateValue(employee.terminationDate),
+    workHoursPerDay: String(employee.workMinutesPerDay / 60),
+    systemRole: employee.systemRole,
+    attendanceEnabled: employee.attendanceEnabled,
+    leaveEnabled: employee.leaveEnabled,
+    workboardEnabled: employee.workboardEnabled,
+  };
+}
+
+function normalizedDate(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "-" || trimmed === "재직중") return "";
+  return trimmed.replaceAll(".", "-").replaceAll("/", "-");
+}
+
+function parseRoster(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.flatMap((line) => {
+    const columns = line.includes("\t")
+      ? line.split("\t")
+      : line.includes("|")
+        ? line.split("|")
+        : line.split(",");
+    const [code, name, hireDate, terminationDate, phone, email, role] =
+      columns.map((value) => value.trim());
+
+    if (!code || !name || code === "사번") return [];
+    return [
+      {
+        ...EMPTY_DRAFT,
+        code,
+        name,
+        hireDate: normalizedDate(hireDate ?? ""),
+        terminationDate: normalizedDate(terminationDate ?? ""),
+        phone: phone === "-" ? "" : phone ?? "",
+        email: email === "-" ? "" : (email ?? "").toLowerCase(),
+        systemRole: role?.toUpperCase() === "ADMIN" ? "ADMIN" : "MEMBER",
+        workboardEnabled: Boolean(email && email !== "-"),
+      } satisfies EmployeeDraft,
+    ];
+  });
+}
+
+function employeePayload(draft: EmployeeDraft) {
+  return {
+    code: draft.code.trim(),
+    name: draft.name.trim(),
+    department: draft.department.trim(),
+    position: draft.position.trim(),
+    email: draft.email.trim().toLowerCase(),
+    phone: draft.phone.trim(),
+    hireDate: draft.hireDate,
+    terminationDate: draft.terminationDate,
+    workMinutesPerDay: Math.round(Number(draft.workHoursPerDay) * 60),
+    systemRole: draft.systemRole,
+    attendanceEnabled: draft.attendanceEnabled,
+    leaveEnabled: draft.leaveEnabled,
+    workboardEnabled: Boolean(draft.email.trim()) && draft.workboardEnabled,
+  };
+}
+
 export default function EmployeesAdminPage() {
   const router = useRouter();
+  const isDevelopment = process.env.NODE_ENV === "development";
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<EmployeeDraft>(EMPTY_DRAFT);
+  const [rosterText, setRosterText] = useState("");
+  const [message, setMessage] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
 
-  // 추가 폼
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [department, setDepartment] = useState("");
-
-  const load = useCallback(async () => {
+  async function loadEmployees() {
     setLoading(true);
-    const res = await fetch("/api/admin/employees");
-    if (res.status === 401) {
-      router.replace("/admin/login");
+
+    if (isDevelopment) {
+      const localEmployees = readDevelopmentEmployees().sort((a, b) =>
+        a.code.localeCompare(b.code),
+      );
+      saveDevelopmentEmployees(localEmployees);
+      setEmployees(localEmployees);
+      setLoading(false);
       return;
     }
-    const data = await res.json();
-    setEmployees(data.employees ?? []);
-    setLoading(false);
-  }, [router]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  function flash(ok: boolean, text: string) {
-    setMsg({ ok, text });
-    setTimeout(() => setMsg(null), 4000);
-  }
-
-  async function addEmployee(e: React.FormEvent) {
-    e.preventDefault();
-    const res = await fetch("/api/admin/employees", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, name, department }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      flash(true, `${name} 님을 추가했습니다.`);
-      setCode("");
-      setName("");
-      setDepartment("");
-      load();
-    } else {
-      flash(false, data.error ?? "추가에 실패했습니다.");
+    try {
+      const response = await fetch("/api/admin/employees", {
+        cache: "no-store",
+      });
+      if (response.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
+      const data = await response.json();
+      setEmployees(data.employees ?? []);
+    } catch {
+      setMessage({ ok: false, text: "직원 목록을 불러오지 못했습니다." });
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function toggleActive(emp: Employee) {
-    const res = await fetch(`/api/admin/employees/${emp.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active: !emp.active }),
-    });
-    const data = await res.json();
-    flash(res.ok, res.ok ? "변경했습니다." : data.error);
-    if (res.ok) load();
+  useEffect(() => {
+    void loadEmployees();
+  }, []);
+
+  function flash(ok: boolean, text: string) {
+    setMessage({ ok, text });
+    window.setTimeout(() => setMessage(null), 5000);
   }
 
+  function resetForm() {
+    setEditingId(null);
+    setDraft(EMPTY_DRAFT);
+  }
+
+  async function persistDraft(
+    nextDraft: EmployeeDraft,
+    employeeId?: string,
+  ) {
+    const payload = employeePayload(nextDraft);
+    if (!payload.code || !payload.name || !payload.hireDate) {
+      throw new Error("사번, 이름, 입사일을 입력해 주세요.");
+    }
+    if (
+      !Number.isFinite(payload.workMinutesPerDay) ||
+      payload.workMinutesPerDay < 60 ||
+      payload.workMinutesPerDay > 1440
+    ) {
+      throw new Error("1일 근무시간을 올바르게 입력해 주세요.");
+    }
+
+    if (isDevelopment) {
+      const duplicate = employees.find(
+        (employee) =>
+          employee.id !== employeeId &&
+          (employee.code === payload.code ||
+            (payload.email &&
+              employee.email?.toLowerCase() === payload.email)),
+      );
+      if (duplicate) {
+        throw new Error("동일한 사번 또는 이메일이 이미 등록되어 있습니다.");
+      }
+
+      const employee = normalizeEmployee({
+        id: employeeId ?? `development-${Date.now()}-${payload.code}`,
+        ...payload,
+        department: payload.department || null,
+        position: payload.position || null,
+        email: payload.email || null,
+        phone: payload.phone || null,
+        hireDate: payload.hireDate,
+        terminationDate: payload.terminationDate || null,
+        active: !payload.terminationDate,
+      });
+      const nextEmployees = employeeId
+        ? employees.map((item) => (item.id === employeeId ? employee : item))
+        : [...employees, employee];
+      nextEmployees.sort((a, b) => a.code.localeCompare(b.code));
+      saveDevelopmentEmployees(nextEmployees);
+      setEmployees(nextEmployees);
+      return { workboardSync: null };
+    }
+
+    const response = await fetch(
+      employeeId
+        ? `/api/admin/employees/${employeeId}`
+        : "/api/admin/employees",
+      {
+        method: employeeId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error ?? "직원정보 저장에 실패했습니다.");
+    }
+    return data;
+  }
+
+  async function saveEmployee(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const data = await persistDraft(draft, editingId ?? undefined);
+      const action = editingId ? "변경" : "등록";
+      const syncMessage = data.workboardSync?.message
+        ? ` ${data.workboardSync.message}`
+        : "";
+      flash(true, `${draft.name} 직원정보를 ${action}했습니다.${syncMessage}`);
+      resetForm();
+      if (!isDevelopment) await loadEmployees();
+    } catch (error) {
+      flash(
+        false,
+        error instanceof Error ? error.message : "직원정보 저장에 실패했습니다.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function editEmployee(employee: Employee) {
+    setEditingId(employee.id);
+    setDraft(draftFromEmployee(employee));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function importRoster() {
+    const rows = parseRoster(rosterText);
+    if (rows.length === 0) {
+      flash(false, "가져올 직원 명부를 입력해 주세요.");
+      return;
+    }
+
+    setSaving(true);
+    let saved = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    if (isDevelopment) {
+      const nextEmployees = employees.filter(
+        (employee) =>
+          employee.id !== DEVELOPMENT_EMPLOYEE.id ||
+          rows.some((row) => row.code === employee.code),
+      );
+
+      for (const row of rows) {
+        try {
+          const payload = employeePayload(row);
+          if (!payload.code || !payload.name || !payload.hireDate) {
+            throw new Error("사번, 이름, 입사일이 필요합니다.");
+          }
+
+          const existingIndex = nextEmployees.findIndex(
+            (item) => item.code === payload.code,
+          );
+          const existing =
+            existingIndex >= 0 ? nextEmployees[existingIndex] : null;
+          const duplicateEmail = payload.email
+            ? nextEmployees.find(
+                (item) =>
+                  item.id !== existing?.id &&
+                  item.email?.toLowerCase() === payload.email,
+              )
+            : null;
+          if (duplicateEmail) {
+            throw new Error("동일한 이메일이 이미 등록되어 있습니다.");
+          }
+
+          const employee = normalizeEmployee({
+            id:
+              existing?.id ??
+              `development-${Date.now()}-${payload.code}`,
+            ...payload,
+            department: payload.department || null,
+            position: payload.position || null,
+            email: payload.email || null,
+            phone: payload.phone || null,
+            hireDate: payload.hireDate,
+            terminationDate: payload.terminationDate || null,
+            active: !payload.terminationDate,
+          });
+
+          if (existingIndex >= 0) nextEmployees[existingIndex] = employee;
+          else nextEmployees.push(employee);
+          saved += 1;
+        } catch (error) {
+          failed += 1;
+          errors.push(
+            `${row.code} ${row.name}: ${
+              error instanceof Error ? error.message : "저장 실패"
+            }`,
+          );
+        }
+      }
+
+      nextEmployees.sort((a, b) => a.code.localeCompare(b.code));
+      saveDevelopmentEmployees(nextEmployees);
+      setEmployees(nextEmployees);
+      setSaving(false);
+      if (failed === 0) setRosterText("");
+      flash(
+        failed === 0,
+        `${saved}명 저장 완료${
+          failed ? `, ${failed}명 실패: ${errors.join(" / ")}` : ""
+        }`,
+      );
+      return;
+    }
+
+    for (const row of rows) {
+      try {
+        const existing = employees.find((item) => item.code === row.code);
+        await persistDraft(row, existing?.id);
+        saved += 1;
+      } catch (error) {
+        failed += 1;
+        errors.push(
+          `${row.code} ${row.name}: ${
+            error instanceof Error ? error.message : "저장 실패"
+          }`,
+        );
+      }
+    }
+
+    await loadEmployees();
+    setSaving(false);
+    if (failed === 0) setRosterText("");
+    flash(
+      failed === 0,
+      `${saved}명 저장 완료${failed ? `, ${failed}명 실패: ${errors.join(" / ")}` : ""}`,
+    );
+  }
+
+  const activeCount = employees.filter((employee) => employee.active).length;
+  const adminCount = employees.filter(
+    (employee) => employee.active && employee.systemRole === "ADMIN",
+  ).length;
+  const workboardCount = employees.filter(
+    (employee) =>
+      employee.active && employee.workboardEnabled && employee.email,
+  ).length;
+
   return (
-    <main className="mx-auto max-w-3xl px-6 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">직원 관리</h1>
-        <Link
-          href="/admin"
-          className="text-sm text-slate-400 hover:text-slate-600"
-        >
-          ← 대시보드
-        </Link>
+    <main className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">직원정보 · 권한 관리</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            직원 원장을 기준으로 출퇴근, 근태, WorkBoard 권한을 관리합니다.
+          </p>
+        </div>
+        <div className="flex gap-3 text-sm">
+          <Link href="/leave" className="font-medium text-brand hover:underline">
+            근태
+          </Link>
+          <Link href="/admin" className="text-slate-400 hover:text-slate-600">
+            관리자 대시보드
+          </Link>
+        </div>
       </div>
 
-      {/* 직원 추가 */}
+      <section className="mb-6 grid grid-cols-3 gap-3">
+        <SummaryCard label="재직 직원" value={`${activeCount}명`} />
+        <SummaryCard label="관리자" value={`${adminCount}명`} />
+        <SummaryCard label="WorkBoard 사용" value={`${workboardCount}명`} />
+      </section>
+
       <form
-        onSubmit={addEmployee}
-        className="mb-6 rounded-xl border border-slate-200 bg-white p-4"
+        onSubmit={saveEmployee}
+        className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
       >
-        <div className="mb-3 text-sm font-medium text-slate-600">직원 추가</div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="사번"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-slate-800">
+              {editingId ? "직원정보 수정" : "새 직원 등록"}
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">
+              퇴사일을 입력하면 모든 서비스 접근이 비활성화됩니다.
+            </p>
+          </div>
+          {editingId && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="text-sm text-slate-500 hover:underline"
+            >
+              수정 취소
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="사번 *">
+            <input
+              value={draft.code}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, code: event.target.value }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="이름 *">
+            <input
+              value={draft.name}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, name: event.target.value }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="입사일 *">
+            <input
+              type="date"
+              value={draft.hireDate}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  hireDate: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="퇴사일">
+            <input
+              type="date"
+              value={draft.terminationDate}
+              min={draft.hireDate}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  terminationDate: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="휴대폰번호">
+            <input
+              value={draft.phone}
+              placeholder="010-0000-0000"
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  phone: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="메일주소">
+            <input
+              type="email"
+              value={draft.email}
+              onChange={(event) => {
+                const email = event.target.value;
+                setDraft((current) => ({
+                  ...current,
+                  email,
+                  workboardEnabled: email
+                    ? current.workboardEnabled
+                    : false,
+                }));
+              }}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="부서">
+            <input
+              value={draft.department}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  department: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="직급">
+            <input
+              value={draft.position}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  position: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="1일 근무시간">
+            <input
+              type="number"
+              min="1"
+              max="24"
+              step="0.5"
+              value={draft.workHoursPerDay}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  workHoursPerDay: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="시스템 권한">
+            <select
+              value={draft.systemRole}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  systemRole:
+                    event.target.value === "ADMIN" ? "ADMIN" : "MEMBER",
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+            >
+              <option value="MEMBER">일반 직원</option>
+              <option value="ADMIN">관리자</option>
+            </select>
+          </Field>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <Permission
+            label="출퇴근 사용"
+            checked={draft.attendanceEnabled}
+            onChange={(checked) =>
+              setDraft((current) => ({
+                ...current,
+                attendanceEnabled: checked,
+              }))
+            }
           />
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="이름"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          <Permission
+            label="휴가·출장 사용"
+            checked={draft.leaveEnabled}
+            onChange={(checked) =>
+              setDraft((current) => ({ ...current, leaveEnabled: checked }))
+            }
           />
-          <input
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            placeholder="부서(선택)"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          <Permission
+            label="WorkBoard 사용"
+            checked={draft.workboardEnabled}
+            disabled={!draft.email}
+            onChange={(checked) =>
+              setDraft((current) => ({
+                ...current,
+                workboardEnabled: checked,
+              }))
+            }
           />
         </div>
+
         <button
           type="submit"
-          className="mt-3 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+          disabled={saving}
+          className="mt-4 rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
         >
-          추가
+          {saving
+            ? "저장 중..."
+            : editingId
+              ? "변경사항 저장"
+              : "직원 등록"}
         </button>
       </form>
 
-      {msg && (
+      <details className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">
+        <summary className="font-semibold text-slate-800">
+          직원 명부 일괄 등록
+        </summary>
+        <p className="mt-2 text-sm text-slate-500">
+          한 줄에 사번, 이름, 입사일, 퇴사일, 휴대폰, 이메일, 권한 순서로
+          입력합니다. 쉼표나 탭으로 구분할 수 있습니다.
+        </p>
+        <textarea
+          value={rosterText}
+          onChange={(event) => setRosterText(event.target.value)}
+          rows={7}
+          placeholder={"사번,이름,입사일,퇴사일,휴대폰,이메일,권한"}
+          className="mt-4 w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 font-mono text-sm"
+        />
+        <button
+          type="button"
+          disabled={saving}
+          onClick={importRoster}
+          className="mt-3 rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          명부 저장 및 권한 동기화
+        </button>
+      </details>
+
+      {message && (
         <div
-          className={`mb-4 rounded-lg px-4 py-2 text-sm ${
-            msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
+          className={`mb-4 rounded-lg px-4 py-3 text-sm ${
+            message.ok
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-red-50 text-red-600"
           }`}
         >
-          {msg.text}
+          {message.text}
         </div>
       )}
 
-      {/* 직원 목록 */}
       {loading ? (
-        <div className="py-16 text-center text-slate-400">불러오는 중…</div>
-      ) : employees.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white py-16 text-center text-slate-400">
-          등록된 직원이 없습니다. 위에서 추가하세요.
+        <div className="py-16 text-center text-slate-400">
+          직원 정보를 불러오는 중입니다.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[560px] text-sm">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+          <table className="w-full min-w-[1200px] text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">사번</th>
-                <th className="px-4 py-3 font-medium">이름</th>
-                <th className="px-4 py-3 font-medium">부서</th>
+                <th className="px-4 py-3 font-medium">직원</th>
+                <th className="px-4 py-3 font-medium">입·퇴사일</th>
+                <th className="px-4 py-3 font-medium">연락처</th>
+                <th className="px-4 py-3 font-medium">권한</th>
+                <th className="px-4 py-3 font-medium">서비스 사용</th>
                 <th className="px-4 py-3 font-medium">상태</th>
                 <th className="px-4 py-3 font-medium">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {employees.map((e) => (
-                <tr key={e.id} className={e.active ? "" : "opacity-50"}>
-                  <td className="px-4 py-3 font-mono text-slate-600">{e.code}</td>
-                  <td className="px-4 py-3">{e.name}</td>
-                  <td className="px-4 py-3 text-slate-500">
-                    {e.department ?? "-"}
+              {employees.map((employee) => (
+                <tr
+                  key={employee.id}
+                  className={employee.active ? "" : "opacity-50"}
+                >
+                  <td className="px-4 py-3 font-mono text-slate-600">
+                    {employee.code}
                   </td>
                   <td className="px-4 py-3">
-                    {e.active ? (
-                      <span className="text-slate-700">활성</span>
-                    ) : (
-                      <span className="text-slate-400">비활성</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-3 text-xs">
-                      <button
-                        onClick={() => toggleActive(e)}
-                        className="text-slate-500 hover:underline"
-                      >
-                        {e.active ? "비활성화" : "활성화"}
-                      </button>
+                    <div className="font-semibold text-slate-800">
+                      {employee.name}
                     </div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      {[employee.department, employee.position]
+                        .filter(Boolean)
+                        .join(" · ") || "부서 미지정"}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    <div>입사 {displayDate(employee.hireDate)}</div>
+                    <div className="mt-1">
+                      퇴사 {displayDate(employee.terminationDate)}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    <div>{employee.phone ?? "-"}</div>
+                    <div className="mt-1 text-xs">{employee.email ?? "-"}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {employee.systemRole === "ADMIN" ? "관리자" : "일반 직원"}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    <div>
+                      출퇴근 {employee.attendanceEnabled ? "사용" : "차단"}
+                    </div>
+                    <div className="mt-1">
+                      근태 {employee.leaveEnabled ? "사용" : "차단"}
+                    </div>
+                    <div className="mt-1">
+                      WorkBoard{" "}
+                      {employee.workboardEnabled && employee.email
+                        ? "사용"
+                        : "차단"}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        employee.active
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {employee.active ? "재직" : "퇴사"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => editEmployee(employee)}
+                      className="text-sm font-semibold text-brand hover:underline"
+                    >
+                      수정
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -180,6 +822,59 @@ export default function EmployeesAdminPage() {
           </table>
         </div>
       )}
+
+      <p className="mt-4 text-xs text-slate-400">
+        퇴사자는 삭제하지 않고 비활성화해 기존 출퇴근·근태·업무 기록을
+        보존합니다.
+      </p>
     </main>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="text-sm font-medium text-slate-600">
+      <span className="mb-1 block">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function Permission({
+  label,
+  checked,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="mt-1 text-xl font-bold text-slate-800">{value}</div>
+    </div>
   );
 }

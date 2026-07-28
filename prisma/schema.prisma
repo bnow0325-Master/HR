@@ -1,44 +1,82 @@
-// Prisma schema for checkinout — 직원 출퇴근 기록 시스템
-// 로컬 개발은 SQLite 사용. 프로덕션에서는 provider를 "postgresql"로 바꾸세요.
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Prisma 7: 연결 URL은 prisma.config.ts(마이그레이션)와
-// PrismaClient 어댑터(런타임)에서 관리한다. 여기서는 provider만 선언.
 datasource db {
   provider = "postgresql"
 }
 
-// 직원
 model Employee {
-  id         String             @id @default(cuid())
-  code       String             @unique // 사번
-  name       String
-  department String?
-  pinHash    String? // 본인 인증용 PIN (scrypt 해시, "salt:hash"). 평문 저장 안 함
-  active     Boolean            @default(true)
-  createdAt  DateTime           @default(now())
-  records    AttendanceRecord[]
+  id                String             @id @default(cuid())
+  code              String             @unique
+  name              String
+  department        String?
+  position          String?
+  email             String?            @unique
+  phone             String?
+  hireDate          DateTime?
+  terminationDate   DateTime?
+  workMinutesPerDay Int                @default(480)
+  systemRole        String             @default("MEMBER")
+  attendanceEnabled Boolean            @default(true)
+  leaveEnabled      Boolean            @default(true)
+  workboardEnabled  Boolean            @default(false)
+  pinHash           String?
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @default(now()) @updatedAt
+  records           AttendanceRecord[]
+  leaveRequests     LeaveRequest[]
+  businessTrips     BusinessTrip[]
+
+  @@index([active, code])
 }
 
-// 출퇴근 기록
 model AttendanceRecord {
   id         String   @id @default(cuid())
   employee   Employee @relation(fields: [employeeId], references: [id])
   employeeId String
-  type       String // "IN"(출근) | "OUT"(퇴근)
+  type       String
   timestamp  DateTime @default(now())
-
-  // 원격 차단 검증 관련 필드
-  method    String  @default("MANUAL") // "MANUAL" | "QR" | "GPS"
-  verified  Boolean @default(false) // 현장 확인(QR/GPS) 통과 여부
-  latitude  Float?
-  longitude Float?
-  note      String?
-
-  createdAt DateTime @default(now())
+  method     String   @default("MANUAL")
+  verified   Boolean  @default(false)
+  latitude   Float?
+  longitude  Float?
+  note       String?
+  createdAt  DateTime @default(now())
 
   @@index([employeeId, timestamp])
+}
+
+model LeaveRequest {
+  id             String   @id @default(cuid())
+  employee       Employee @relation(fields: [employeeId], references: [id])
+  employeeId     String
+  leaveType      String
+  leaveDate      DateTime
+  unitsMinutes   Int
+  reason         String?
+  status         String   @default("PENDING")
+  reviewerNote   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([employeeId, leaveDate])
+  @@index([status, leaveDate])
+}
+
+model BusinessTrip {
+  id         String   @id @default(cuid())
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  employeeId String
+  startDate  DateTime
+  endDate    DateTime
+  reason     String
+  status     String   @default("REGISTERED")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([employeeId, startDate, endDate])
+  @@index([status, startDate])
 }
