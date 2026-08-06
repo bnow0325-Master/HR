@@ -82,6 +82,12 @@ export default async function AdminPage({
         </div>
         <div className="flex items-center gap-3 text-sm">
           <Link
+            href="/admin/attendance"
+            className="font-medium text-brand hover:underline"
+          >
+            LIVECARE 원장
+          </Link>
+          <Link
             href="/admin/employees"
             className="font-medium text-brand hover:underline"
           >
