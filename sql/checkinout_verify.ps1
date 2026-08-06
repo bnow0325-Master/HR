@@ -1,6 +1,9 @@
 $ErrorActionPreference = 'Stop'
 
-$connectionString = 'Server=db.livecareworld.com;Database=LIVECARE;User ID=livecare;Password=!livecare!;TrustServerCertificate=True;'
+$connectionString = $env:LIVECARE_SQLSERVER_CONNECTION_STRING
+if ([string]::IsNullOrWhiteSpace($connectionString)) {
+    throw 'LIVECARE_SQLSERVER_CONNECTION_STRING environment variable is required.'
+}
 $connection = New-Object System.Data.SqlClient.SqlConnection $connectionString
 $connection.Open()
 
