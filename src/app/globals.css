@@ -107,6 +107,8 @@ button {
 .border-slate-900 { border-color: #0f172a; }
 .border-emerald-200 { border-color: #a7f3d0; }
 .border-blue-200 { border-color: #bfdbfe; }
+.border-amber-200 { border-color: #fde68a; }
+.border-red-200 { border-color: #fecaca; }
 .border-dashed { border-style: dashed; }
 
 .bg-white { background: #fff; }
@@ -121,6 +123,8 @@ button {
 .bg-emerald-50 { background: #ecfdf5; }
 .bg-blue-50 { background: #eff6ff; }
 .bg-blue-600 { background: #2563eb; }
+.bg-amber-50 { background: #fffbeb; }
+.bg-slate-950 { background: #020617; }
 
 .text-white { color: #fff; }
 .text-slate-300 { color: #cbd5e1; }
@@ -130,11 +134,17 @@ button {
 .text-slate-700 { color: #334155; }
 .text-slate-800 { color: #1e293b; }
 .text-slate-900 { color: #0f172a; }
+.text-slate-950 { color: #020617; }
 .text-red-500,
 .text-red-600 { color: #dc2626; }
+.text-red-700 { color: #b91c1c; }
+.text-red-800 { color: #991b1b; }
 .text-emerald-600,
 .text-emerald-700 { color: #047857; }
 .text-amber-500 { color: #f59e0b; }
+.text-amber-800 { color: #92400e; }
+.text-amber-900,
+.text-amber-950 { color: #78350f; }
 .text-blue-100 { color: #dbeafe; }
 .text-blue-600 { color: #2563eb; }
 .text-blue-700 { color: #1d4ed8; }
@@ -161,6 +171,8 @@ button {
 .tracking-widest {
   letter-spacing: 0.2em;
 }
+
+.tracking-tight { letter-spacing: -0.025em; }
 
 .mx-auto { margin-left: auto; margin-right: auto; }
 .ml-1 { margin-left: 0.25rem; }
@@ -195,6 +207,7 @@ button {
 .max-w-4xl { max-width: 56rem; }
 .max-w-5xl { max-width: 64rem; }
 .max-w-6xl { max-width: 72rem; }
+.max-w-7xl { max-width: 80rem; }
 
 .min-w-\[560px\] { min-width: 560px; }
 .min-w-\[620px\] { min-width: 620px; }
@@ -251,6 +264,11 @@ button {
 .py-20 { padding-top: 5rem; padding-bottom: 5rem; }
 .p-4 { padding: 1rem; }
 .p-5 { padding: 1.25rem; }
+.p-6 { padding: 1.5rem; }
+
+.space-y-6 > * + * { margin-top: 1.5rem; }
+.leading-5 { line-height: 1.25rem; }
+.leading-6 { line-height: 1.5rem; }
 
 .grid-cols-1 { grid-template-columns: minmax(0, 1fr); }
 .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -456,6 +474,17 @@ textarea:focus {
 
   .md\:grid-cols-\[1\.5fr_1fr_auto\] {
     grid-template-columns: 1.5fr 1fr auto;
+  }
+}
+
+@media (min-width: 640px) {
+  .livecare-filters {
+    grid-template-columns: 11.25rem minmax(13.75rem, 1fr) auto;
+  }
+
+  .sm\:px-8 {
+    padding-left: 2rem;
+    padding-right: 2rem;
   }
 }
 

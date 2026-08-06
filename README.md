@@ -24,6 +24,8 @@ PC 브라우저 버튼 클릭은 원격 접속(RDP, 크롬 원격 데스크톱)�
 - **Next.js 16 (App Router, Turbopack) + React 19 + TypeScript 5.9**
 - **Prisma 7 + PostgreSQL** — 런타임은 드라이버 어댑터(`@prisma/adapter-pg`),
   마이그레이션 설정은 `prisma.config.ts` (Neon / Vercel Postgres / Supabase)
+- **mssql + LIVECARE SQL Server** — 이관된 `CHECKINOUT_*` 근태 원장을 관리자
+  화면에서 읽기 전용으로 조회
 - **Tailwind CSS 4** (`@tailwindcss/postcss`, CSS `@theme`)
 - **otplib 13** (동적 QR TOTP), **qrcode** (QR 이미지), **html5-qrcode** (카메라 스캔)
 
@@ -42,6 +44,7 @@ PC 브라우저 버튼 클릭은 원격 접속(RDP, 크롬 원격 데스크톱)�
 | `/check` | 직원용 출퇴근 화면 — 직원 선택 → 위치 확인 → QR 입력 → 출근/퇴근 |
 | `/kiosk` | 사무실 태블릿/모니터용 QR 화면 (자동 갱신) |
 | `/admin` | 관리자 대시보드 — 오늘/주간/월간/연간 근태 집계, CSV (로그인 필요) |
+| `/admin/attendance` | 관리자 — LIVECARE 출퇴근·직원·연차 원장 통합 조회 (로그인 필요) |
 | `/admin/employees` | 관리자 — 직원·PIN 등록/관리 (로그인 필요) |
 | `/admin/login` | 관리자 로그인 (`ADMIN_PASSWORD`) |
 
@@ -69,6 +72,14 @@ npm run dev          # http://localhost:3000
 
 키오스크 화면(`/kiosk`)을 사무실 모니터에 띄워두고, 직원은 폰으로 `/check`에
 접속해 출퇴근합니다.
+
+### LIVECARE 원장 연결
+
+신규 출퇴근 입력과 휴가·출장 기능은 기존 PostgreSQL을 계속 사용합니다.
+`/admin/attendance`만 SQL Server의 `CHECKINOUT_EMPLOYEE`,
+`CHECKINOUT_ATTENDANCE_RECORD`, `CHECKINOUT_ANNUAL_LEAVE_BALANCE`를 직접
+조회합니다. 운영 DB 백업과 전용 쓰기 계정이 준비되기 전까지 이 연결은 조회 전용으로
+유지합니다. 필요한 서버 환경변수는 `.env.example`을 참고하세요.
 
 ## 로드맵
 

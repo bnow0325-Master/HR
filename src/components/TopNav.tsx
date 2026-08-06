@@ -41,8 +41,8 @@ export default function TopNav() {
           BNOW WORKBOARD
         </Link>
 
-        <Link href="/leave" className="top-nav-center">
-          근태
+        <Link href="/admin/attendance" className="top-nav-center">
+          근태관리
         </Link>
 
         <nav aria-label="주요 메뉴" className="top-nav-actions">
