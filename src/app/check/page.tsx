@@ -192,6 +192,10 @@ function CheckPageContent() {
     () => searchParams.get("name")?.trim() ?? "",
     [searchParams],
   );
+  const requestedEmployeeEmail = useMemo(
+    () => searchParams.get("email")?.trim() ?? "",
+    [searchParams],
+  );
   const developmentEmployeeName =
     process.env.NODE_ENV === "development" ? "추동현" : "";
   const effectiveEmployeeName =
@@ -203,7 +207,19 @@ function CheckPageContent() {
       return;
     }
 
-    fetch("/api/employees")
+    const storedEmployeeId =
+      window.sessionStorage.getItem("workboardEmployeeId") ?? "";
+    const params = new URLSearchParams();
+
+    if (requestedEmployeeEmail) {
+      params.set("email", requestedEmployeeEmail);
+    } else if (requestedEmployeeName) {
+      params.set("name", requestedEmployeeName);
+    } else if (storedEmployeeId) {
+      params.set("employeeId", storedEmployeeId);
+    }
+
+    fetch(`/api/employees${params.size > 0 ? `?${params}` : ""}`)
       .then((response) => {
         if (!response.ok) {
           throw new Error("직원 목록을 불러오지 못했습니다.");
@@ -216,12 +232,30 @@ function CheckPageContent() {
       .catch(() => {
         setEmployees([]);
       });
-  }, [isDevelopment]);
+  }, [isDevelopment, requestedEmployeeEmail, requestedEmployeeName]);
 
   useEffect(() => {
     if (employees.length === 0) return;
 
-    if (!effectiveEmployeeName) {
+    const storedEmployeeId =
+      window.sessionStorage.getItem("workboardEmployeeId") ?? "";
+    const matched =
+      employees.find((employee) => employee.id === storedEmployeeId) ??
+      employees.find(
+        (employee) => employee.name.trim() === effectiveEmployeeName,
+      ) ??
+      (requestedEmployeeEmail && employees.length === 1
+        ? employees[0]
+        : undefined);
+
+    if (!matched) {
+      if (requestedEmployeeEmail || effectiveEmployeeName) {
+        setEmployeeError(
+          "워크보드 로그인 정보와 일치하는 재직 직원을 찾지 못했습니다.",
+        );
+        return;
+      }
+
       if (!employeeId) {
         setEmployeeError(
           "워크보드 로그인 사용자 정보가 없어 직원을 자동으로 찾지 못했습니다.",
@@ -230,22 +264,16 @@ function CheckPageContent() {
       return;
     }
 
-    const matched = employees.find(
-      (employee) => employee.name.trim() === effectiveEmployeeName,
-    );
-
-    if (!matched) {
-      setEmployeeError(
-        `워크보드 사용자 "${effectiveEmployeeName}" 와 일치하는 직원을 찾지 못했습니다.`,
-      );
-      return;
-    }
-
     setEmployeeId(matched.id);
     setEmployeeError("");
     window.sessionStorage.setItem("workboardEmployeeName", matched.name);
     window.sessionStorage.setItem("workboardEmployeeId", matched.id);
-  }, [effectiveEmployeeName, employeeId, employees]);
+  }, [
+    effectiveEmployeeName,
+    employeeId,
+    employees,
+    requestedEmployeeEmail,
+  ]);
 
   async function resolveAddress(lat: number, lng: number) {
     setAddress({ status: "loading" });
