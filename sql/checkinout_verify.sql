@@ -1,0 +1,30 @@
+SET NOCOUNT ON;
+
+SELECT 'employees' AS metric, COUNT(*) AS value
+FROM dbo.CHECKINOUT_EMPLOYEE
+UNION ALL
+SELECT 'attendance_records', COUNT(*)
+FROM dbo.CHECKINOUT_ATTENDANCE_RECORD
+UNION ALL
+SELECT 'annual_leave_balances', COUNT(*)
+FROM dbo.CHECKINOUT_ANNUAL_LEAVE_BALANCE;
+
+SELECT
+    EMPLOYEE_CODE,
+    EMPLOYEE_NAME,
+    LOGIN_ID,
+    IS_ACTIVE,
+    RESIGNED_ON
+FROM dbo.CHECKINOUT_EMPLOYEE
+WHERE EMPLOYEE_NAME = N'이세언'
+   OR LOGIN_ID = N'su.lee@bnow.co.kr';
+
+SELECT
+    MIN(RECORDED_AT) AS first_recorded_at,
+    MAX(RECORDED_AT) AS last_recorded_at,
+    COUNT(*) AS record_count
+FROM dbo.CHECKINOUT_ATTENDANCE_RECORD ar
+INNER JOIN dbo.CHECKINOUT_EMPLOYEE e
+    ON e.EMPLOYEE_ID = ar.EMPLOYEE_ID
+WHERE e.EMPLOYEE_NAME = N'이세언'
+   OR e.LOGIN_ID = N'su.lee@bnow.co.kr';

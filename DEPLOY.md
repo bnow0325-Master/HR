@@ -1,6 +1,6 @@
 # 배포 가이드 — Vercel + Neon (무료)
 
-폰에서 실제로 출퇴근(카메라 QR 스캔 + GPS)을 쓰려면 **HTTPS 주소**가 필요합니다.
+회사 PC 브라우저에서 위치 확인을 쓰려면 **HTTPS 주소**가 필요합니다.
 아래 순서대로 하면 무료로 배포할 수 있습니다. (약 10~15분)
 
 > 왜 Postgres인가: Vercel은 서버리스라 파일(SQLite)을 저장할 수 없습니다. 그래서
@@ -13,8 +13,7 @@
 
 따라 하며 하나씩 체크하세요. 각 항목의 자세한 설명은 아래 섹션에 있습니다.
 
-**0. 비밀값 준비** — 터미널에서 `openssl rand -hex 32` 로 `QR_TOTP_SECRET` 생성,
-   `ADMIN_PASSWORD`(로그인 비번)는 강한 값으로 직접 정하기.
+**0. 비밀값 준비** — `ADMIN_PASSWORD`(로그인 비번)는 강한 값으로 직접 정하기.
 
 **1. Neon DB**
 - [ ] neon.tech GitHub 로그인 → 프로젝트 `checkinout` 생성 (Region: Singapore 권장)
@@ -23,7 +22,7 @@
 **2. Vercel 배포**
 - [ ] vercel.com GitHub 로그인 → Add New → Project → `checkinout` **Import**
 - [ ] Framework = **Next.js** 확인
-- [ ] 환경변수 6개 입력: `DATABASE_URL`, `QR_TOTP_SECRET`, `ADMIN_PASSWORD`,
+- [ ] 환경변수 5개 입력: `DATABASE_URL`, `ADMIN_PASSWORD`,
       `OFFICE_LATITUDE`(37.5636), `OFFICE_LONGITUDE`(126.9868), `OFFICE_RADIUS_METERS`(150)
 - [ ] **Deploy** (빌드 시 DB 마이그레이션 자동 적용) → 배포 주소 확인
 
@@ -31,8 +30,7 @@
 - [ ] `배포주소/admin` 로그인(`ADMIN_PASSWORD`) → **직원 관리**에서 직원·PIN 추가
 
 **4. 실제 확인 (폰)**
-- [ ] `배포주소/kiosk` 를 사무실 화면에 띄움 (QR 자동 갱신)
-- [ ] 폰에서 `배포주소/check` → 이름·PIN·위치·QR 스캔 → 출근
+- [ ] 회사 PC에서 `배포주소/check` → 이름·PIN·위치 확인 → 출근
 - [ ] `배포주소/admin` 에서 기록이 **✓ 현장확인** 으로 보이는지 확인
 - [ ] 사무실 밖에서 시도 → **차단**되는지 확인
 
@@ -57,16 +55,10 @@
    | Name | Value |
    |------|-------|
    | `DATABASE_URL` | (1)에서 복사한 Neon 연결 문자열 |
-   | `QR_TOTP_SECRET` | 무작위 문자열 (아래 명령으로 생성) |
    | `ADMIN_PASSWORD` | 관리자 로그인 비밀번호 (강력하게) |
    | `OFFICE_LATITUDE` | `37.5636` (실제 사무실 좌표로 보정 권장) |
    | `OFFICE_LONGITUDE` | `126.9868` |
    | `OFFICE_RADIUS_METERS` | `150` |
-
-   `QR_TOTP_SECRET` 생성 예시(터미널):
-   ```bash
-   openssl rand -hex 32
-   ```
 4. **Deploy** 클릭.
    - 빌드 시 `vercel-build` 스크립트가 **DB 마이그레이션(`prisma migrate deploy`)을 자동 적용**한 뒤 앱을 빌드합니다. 별도 작업 필요 없음.
 
@@ -81,11 +73,10 @@
 ## 4) 사용하기
 
 - 배포된 주소(예: `https://checkinout.vercel.app`)를 폰에서 엽니다.
-- **키오스크**: 사무실 태블릿/모니터에서 `/kiosk` 를 띄워둡니다 (QR 자동 갱신).
-- **직원**: 폰에서 접속 → 이름 선택 → PIN 입력 → 위치 확인 → QR 스캔 → 출근/퇴근.
+- **직원**: 회사 PC에서 접속 → 이름 선택 → PIN 입력 → 위치 확인 → 출근/퇴근.
 - **관리자**: `/admin` 에서 오늘/주간/월간/연간 집계 및 CSV 내려받기.
 
-> HTTPS 주소이므로 카메라·위치 권한이 정상 동작합니다. (localhost 외 http에서는 차단됨)
+> HTTPS 주소이므로 위치 권한이 정상 동작합니다. (localhost 외 http에서는 차단됨)
 
 ---
 
