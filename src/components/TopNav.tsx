@@ -42,7 +42,7 @@ export default function TopNav() {
         </Link>
 
         <Link href="/attendance" className="top-nav-center">
-          근태관리
+          인사관리
         </Link>
 
         <nav aria-label="주요 메뉴" className="top-nav-actions">

@@ -216,7 +216,7 @@ export default function LeavePage() {
       setSummary(data.summary);
       setRequests(data.requests);
     } catch {
-      setMessage({ ok: false, text: "근태 정보를 불러오지 못했습니다." });
+      setMessage({ ok: false, text: "휴가 정보를 불러오지 못했습니다." });
     } finally {
       setLoading(false);
     }
@@ -367,7 +367,7 @@ export default function LeavePage() {
 
       {loading ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-20 text-center text-slate-400">
-          근태 정보를 불러오는 중입니다.
+          휴가 정보를 불러오는 중입니다.
         </div>
       ) : summary ? (
         <>

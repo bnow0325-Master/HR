@@ -33,9 +33,9 @@ export default function AttendancePage() {
     <main className="attendance-hub">
       <section className="attendance-hub-hero">
         <p className="attendance-hub-eyebrow">BNOW PEOPLE</p>
-        <h1>근태관리</h1>
+        <h1>인사관리</h1>
         <p className="attendance-hub-intro">
-          출퇴근부터 휴가와 출장까지, 로그인한 본인의 근태 업무를 한곳에서
+          출퇴근부터 휴가와 출장까지, 로그인한 본인의 인사 업무를 한곳에서
           관리합니다.
         </p>
       </section>

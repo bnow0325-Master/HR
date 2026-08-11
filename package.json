@@ -2,7 +2,7 @@
   "name": "checkinout",
   "version": "0.1.0",
   "private": true,
-  "description": "직원 출퇴근 기록 시스템 (원격 출퇴근 차단: 동적 QR + GPS)",
+  "description": "BNOW 인사관리 시스템 (출퇴근·휴가·출장)",
   "engines": {
     "node": ">=22 <23"
   },
