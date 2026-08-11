@@ -1,4 +1,9 @@
-# 배포 가이드 — Vercel + Neon (무료)
+# 배포 가이드 — 자체 서버 + Neon
+
+현재 운영 표준은 Ubuntu 자체 서버의 Docker Compose와 Nginx입니다. 실제 배포
+구성, 검증 및 롤백 절차는 [`deploy/README.md`](./deploy/README.md)를 따릅니다.
+
+아래 Vercel 내용은 이전 운영 이력 확인을 위해 남겨 둔 레거시 안내입니다.
 
 폰에서 실제로 출퇴근(카메라 QR 스캔 + GPS)을 쓰려면 **HTTPS 주소**가 필요합니다.
 아래 순서대로 하면 무료로 배포할 수 있습니다. (약 10~15분)

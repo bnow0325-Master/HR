@@ -22,6 +22,8 @@ yarn-error.log*
 
 # local env files
 .env
+.env.*
+!.env.example
 .env*.local
 
 # database (sqlite for local dev)
