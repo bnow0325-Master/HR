@@ -1,0 +1,14 @@
+.git
+.github
+.next
+.vercel
+node_modules
+npm-debug.log*
+.env
+.env.*
+!.env.example
+Dockerfile*
+compose*.yml
+DEPLOY.md
+LOCAL_SETUP.md
+README.md
