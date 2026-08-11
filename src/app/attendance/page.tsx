@@ -26,6 +26,12 @@ const attendanceMenus = [
     title: "내 출퇴근 기록",
     description: "이번 달 출퇴근 기록과 근무시간을 한눈에 조회합니다.",
   },
+  {
+    href: "/admin/employees",
+    eyebrow: "DIRECTORY",
+    title: "직원명부 관리",
+    description: "직원 정보, 재직 상태, 인사관리 및 WorkBoard 권한을 관리합니다.",
+  },
 ];
 
 export default function AttendancePage() {
@@ -35,7 +41,7 @@ export default function AttendancePage() {
         <p className="attendance-hub-eyebrow">BNOW PEOPLE</p>
         <h1>인사관리</h1>
         <p className="attendance-hub-intro">
-          출퇴근부터 휴가와 출장까지, 로그인한 본인의 인사 업무를 한곳에서
+          출퇴근부터 휴가, 출장, 직원명부까지 BNOW의 인사 업무를 한곳에서
           관리합니다.
         </p>
       </section>

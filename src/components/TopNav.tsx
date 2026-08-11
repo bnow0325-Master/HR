@@ -19,6 +19,11 @@ const navItems = [
     label: "출장관리",
     matches: ["/business-trips"],
   },
+  {
+    href: "/admin/employees",
+    label: "명부관리",
+    matches: ["/admin/employees"],
+  },
 ];
 
 const hiddenPrefixes = ["/kiosk"];
@@ -49,7 +54,9 @@ export default function TopNav() {
           <ul>
             {navItems.map((item) => {
               const isActive = item.matches.some((prefix) =>
-                prefix === "/" ? pathname === "/" : pathname.startsWith(prefix),
+                prefix === "/" || prefix === "/admin"
+                  ? pathname === prefix
+                  : pathname.startsWith(prefix),
               );
 
               return (
