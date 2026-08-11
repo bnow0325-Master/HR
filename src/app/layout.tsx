@@ -3,8 +3,8 @@ import "./globals.css";
 import TopNav from "@/components/TopNav";
 
 export const metadata: Metadata = {
-  title: "checkinout — 출퇴근 기록",
-  description: "직원 출퇴근 기록 시스템 (워크보드 사용자 + 브라우저 위치 확인)",
+  title: "BNOW 인사관리",
+  description: "BNOW 직원 인사관리 시스템 (출퇴근·휴가·출장)",
 };
 
 export const viewport: Viewport = {

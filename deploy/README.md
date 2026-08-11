@@ -1,7 +1,7 @@
 # 자체 서버 배포
 
 CheckInOut은 Ubuntu 운영 서버에서 Docker Compose로 실행하고, 호스트 Nginx가
-`checkinout.bnow.co.kr`의 HTTPS를 종료한 뒤 `127.0.0.1:3010`으로 프록시한다.
+`hr.bnow.co.kr`의 HTTPS를 종료한 뒤 `127.0.0.1:3010`으로 프록시한다.
 
 ## 운영 구성
 
@@ -25,11 +25,11 @@ Compose는 앱 시작 전에 Prisma 운영 마이그레이션을 적용한다. �
 
 ## Nginx와 TLS
 
-1. `deploy/nginx/checkinout.bnow.co.kr.conf`를
-   `/etc/nginx/sites-available/checkinout.bnow.co.kr`에 설치한다.
+1. `deploy/nginx/hr.bnow.co.kr.conf`를
+   `/etc/nginx/sites-available/hr.bnow.co.kr`에 설치한다.
 2. `sites-enabled`에 심볼릭 링크를 만든 뒤 `nginx -t`를 통과시킨다.
 3. DNS A 레코드가 `210.116.101.13`을 가리키는지 확인한다.
-4. `certbot --nginx -d checkinout.bnow.co.kr`로 인증서를 발급한다.
+4. `certbot --nginx -d hr.bnow.co.kr`로 인증서를 발급한다.
 
 ## 롤백
 

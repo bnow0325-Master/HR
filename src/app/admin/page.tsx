@@ -10,7 +10,7 @@ import {
   type Period,
 } from "@/lib/stats";
 
-// 관리자 대시보드 — 기간별(오늘/주간/월간/연간) 근태 집계 (서버 컴포넌트)
+// 관리자 대시보드 — 기간별(오늘/주간/월간/연간) 인사관리 집계 (서버 컴포넌트)
 export const dynamic = "force-dynamic";
 
 const TABS: { key: Period; label: string }[] = [
@@ -78,7 +78,7 @@ export default async function AdminPage({
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">관리자 대시보드</h1>
-          <p className="text-sm text-slate-500">근태 집계 · {label}</p>
+          <p className="text-sm text-slate-500">인사관리 집계 · {label}</p>
         </div>
         <div className="flex items-center gap-3 text-sm">
           <Link

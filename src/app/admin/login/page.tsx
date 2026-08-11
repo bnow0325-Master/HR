@@ -38,7 +38,7 @@ export default function AdminLoginPage() {
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
       <div className="text-center">
         <h1 className="text-2xl font-bold">관리자 로그인</h1>
-        <p className="mt-1 text-sm text-slate-500">checkinout 관리자 전용</p>
+        <p className="mt-1 text-sm text-slate-500">BNOW 인사관리 관리자 전용</p>
       </div>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <input

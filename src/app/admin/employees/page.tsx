@@ -473,12 +473,12 @@ export default function EmployeesAdminPage() {
         <div>
           <h1 className="text-2xl font-bold">직원정보 · 권한 관리</h1>
           <p className="mt-1 text-sm text-slate-500">
-            직원 원장을 기준으로 출퇴근, 근태, WorkBoard 권한을 관리합니다.
+            직원 원장을 기준으로 인사관리와 WorkBoard 권한을 관리합니다.
           </p>
         </div>
         <div className="flex gap-3 text-sm">
           <Link href="/leave" className="font-medium text-brand hover:underline">
-            근태
+            인사관리
           </Link>
           <Link href="/admin" className="text-slate-400 hover:text-slate-600">
             관리자 대시보드
@@ -787,7 +787,7 @@ export default function EmployeesAdminPage() {
                       출퇴근 {employee.attendanceEnabled ? "사용" : "차단"}
                     </div>
                     <div className="mt-1">
-                      근태 {employee.leaveEnabled ? "사용" : "차단"}
+                      휴가관리 {employee.leaveEnabled ? "사용" : "차단"}
                     </div>
                     <div className="mt-1">
                       WorkBoard{" "}
@@ -824,7 +824,7 @@ export default function EmployeesAdminPage() {
       )}
 
       <p className="mt-4 text-xs text-slate-400">
-        퇴사자는 삭제하지 않고 비활성화해 기존 출퇴근·근태·업무 기록을
+        퇴사자는 삭제하지 않고 비활성화해 기존 출퇴근·휴가·출장·업무 기록을
         보존합니다.
       </p>
     </main>
