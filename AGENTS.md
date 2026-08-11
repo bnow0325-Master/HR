@@ -1,52 +1,60 @@
-# BNOW CheckInOut 개발 지침 (Codex/에이전트용)
+# BNOW HR 개발 지침 (Codex/에이전트용)
 
 ## 제품 목적
 
-CheckInOut은 BNOW 임직원의 출퇴근을 정확·안전하게 기록하는 내부 시스템임.
-**본인 PIN + GPS 지오펜싱 + 동적 QR** 3중 검증으로 원격·대리 출퇴근을 방지함.
+BNOW HR은 임직원의 인사 정보를 한곳에서 관리하는 내부 시스템이다.
 
-## 기술 스택 (현재)
+- 출퇴근 등록과 기록 조회
+- 근무시간 및 관리자 집계
+- 휴가 신청과 연차 관리
+- 출장 신청과 출장일지 관리
+- 직원명부, 재직 상태, 인사관리 및 WorkBoard 권한 관리
 
-- Node.js 22 (`.nvmrc` 기준), Next.js 16 (App Router, Turbopack), React 19
-- TypeScript strict (5.9.x — TS7 네이티브 포트는 Next 16 빌드와 미호환이라 사용 안 함)
-- Tailwind CSS 4 (`@tailwindcss/postcss`, CSS `@theme` 기반, `src/app/globals.css`)
-- Prisma 7 + PostgreSQL — **드라이버 어댑터(`@prisma/adapter-pg`)** 로 런타임 연결
-  - 스키마(`prisma/schema.prisma`)의 datasource에는 `url`을 두지 않음
-  - 연결 URL: 런타임=`src/lib/prisma.ts`의 어댑터, 마이그레이션=`prisma.config.ts`
-- otplib 13 (동적 QR TOTP, `src/lib/qr.ts` — `generateSync`/`verifySync`, secret은 바이트)
-- 배포: Vercel(빌드 시 `vercel-build`가 `prisma migrate deploy` 자동 실행) + Neon
+직원명부는 사용자 식별과 권한의 기준 원장이다. 퇴사자는 삭제하지 않고 비활성화해
+기존 출퇴근·휴가·출장·업무 기록을 보존한다.
+
+## 운영 기준
+
+- GitHub: `bnow0325-Master/HR`
+- 로컬 기준 경로: `D:\project\hr`
+- 운영 URL: `https://hr.bnow.co.kr`
+- 배포: Ubuntu 자체 서버 + Docker Compose + Nginx + Let's Encrypt
+- 데이터베이스: Neon PostgreSQL
+
+## 기술 스택
+
+- Node.js 22, Next.js 16 App Router, React 19, TypeScript 5.9 strict
+- Tailwind CSS 4
+- Prisma 7 + PostgreSQL 드라이버 어댑터(`@prisma/adapter-pg`)
+- otplib 13, qrcode, html5-qrcode
 
 ## 작업 원칙
 
-1. 작업 전 원격 기본 브랜치(`main`)의 최신 변경을 받음(`git pull`).
-2. 기능 브랜치에서 변경 후 PR로 `main`에 병합함. 큰 리팩터링과 기능 변경을 한 PR에 섞지 않음.
-3. 실제 직원 이름·사번·위치·출퇴근 기록을 테스트 코드나 문서에 넣지 않음.
-4. `DATABASE_URL`, `QR_TOTP_SECRET`, `ADMIN_PASSWORD`, 토큰 등 비밀값을 커밋하지 않음(`.env`는 gitignore).
-5. 클라이언트가 보낸 시간·위치·직원 식별값을 신뢰하지 않고 서버에서 검증함.
-6. GPS 오차, 권한 거부, 카메라 미지원, QR 만료, 네트워크 실패 흐름을 함께 구현함.
-7. 출퇴근/직원/PIN 변경 등 민감 작업은 관리자 인증(`/admin`, `ADMIN_PASSWORD`) 뒤에 둠.
-8. DB 스키마 변경 시 `npm run db:migrate:dev -- --name <설명>`으로 마이그레이션을 만들고
-   커밋함. PR에 롤백 방법을 기록함.
+1. 작업 전 `main`의 최신 변경을 받는다.
+2. `codex/` 기능 브랜치에서 작업하고 PR로 `main`에 병합한다.
+3. 실제 직원 개인정보와 비밀값을 코드·테스트·문서·Git에 기록하지 않는다.
+4. `.env`, `.env.production.local`, DB 비밀번호, 토큰은 절대 커밋하지 않는다.
+5. 직원 식별, 출퇴근 시간, 위치, 관리자 권한은 서버에서 검증한다.
+6. 직원명부 변경과 관리자 기능은 관리자 인증 뒤에 둔다.
+7. DB 스키마 변경 시 마이그레이션을 함께 커밋하고 롤백 방법을 PR에 기록한다.
+8. 운영 배포 전 자체 서버의 HTTPS, DB 연결, 주요 화면과 API를 검증한다.
 
 ## 필수 명령
 
 ```bash
-npm ci                 # 의존성 설치(락파일 기준)
-npm run check          # 타입검사 + 프로덕션 빌드 (커밋/PR 전 반드시 통과)
-npm run db:migrate     # 마이그레이션 적용(운영/배포)
-npm run db:migrate:dev # 개발용 마이그레이션 생성+적용
-npm run db:seed        # 데모 직원 시드
-npm run dev            # 개발 서버
+npm ci
+npm run check
+npm run db:migrate
+npm run db:migrate:dev -- --name <설명>
+npm run db:seed
+npm run dev
 ```
-
-DB가 필요한 명령은 `.env`의 `DATABASE_URL`(PostgreSQL)이 있어야 함. 로컬에 Postgres가
-없으면 Neon 개발용 연결 문자열을 그대로 사용해도 됨.
 
 ## 완료 기준
 
-- `npm run check`(타입검사+빌드) 통과
-- 출근·퇴근 정상/실패 흐름: PIN 오류→401, 사무실 밖→403, 무효 QR→403, 정상→200
-- 관리자 인증 가드(미인증 401/리다이렉트)와 직원·PIN 관리 동작 확인
-- QR 만료·재사용 차단, 위치 경계값·GPS 오차 처리 확인
-- 모바일(HTTPS)에서 카메라·위치 권한 흐름 확인(배포 환경)
-- 개인정보·위치정보 최소 수집·노출 확인
+- `npm run check` 통과
+- `/attendance`, `/check`, `/records`, `/leave`, `/business-trips` 정상 동작
+- `/admin`, `/admin/employees` 관리자 인증과 권한 확인
+- 직원명부 변경이 출퇴근·휴가·출장·WorkBoard 권한에 일관되게 반영
+- 개인정보와 위치정보의 수집·노출 최소화
+- `https://hr.bnow.co.kr` 운영 검증 완료

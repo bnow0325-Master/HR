@@ -1,6 +1,6 @@
-# 자체 서버 배포
+# BNOW HR 자체 서버 배포
 
-CheckInOut은 Ubuntu 운영 서버에서 Docker Compose로 실행하고, 호스트 Nginx가
+BNOW HR은 Ubuntu 운영 서버에서 Docker Compose로 실행하고, 호스트 Nginx가
 `hr.bnow.co.kr`의 HTTPS를 종료한 뒤 `127.0.0.1:3010`으로 프록시한다.
 
 ## 운영 구성
@@ -33,6 +33,6 @@ Compose는 앱 시작 전에 Prisma 운영 마이그레이션을 적용한다. �
 
 ## 롤백
 
-새 컨테이너에 문제가 있으면 Nginx 설정을 비활성화하고 기존 Vercel 서비스를
-유지한다. Vercel 프로젝트는 자체 서버의 HTTPS, DB 조회, 출근·퇴근, 관리자
-로그인을 모두 검증한 뒤에만 제거한다.
+새 컨테이너에 문제가 있으면 직전 정상 Docker 이미지로 앱을 되돌린다. Nginx와
+TLS 설정은 유지하고 `/attendance`, `/check`, `/leave`, `/business-trips`,
+`/admin/login`, `/api/employees`를 다시 검증한다.
