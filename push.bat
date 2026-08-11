@@ -10,7 +10,7 @@ if errorlevel 1 echo   (올릴 변경사항이 없을 수 있습니다)
 call git push || goto :error
 echo.
 echo ===== GitHub에 반영 완료! =====
-echo   (Vercel 자동배포가 켜져 있으면 잠시 후 사이트에 반영됩니다)
+echo   (PR 검증과 main 병합 후 자체 서버 배포가 필요합니다)
 pause
 exit /b 0
 :error

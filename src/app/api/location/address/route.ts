@@ -81,7 +81,7 @@ async function reverseWithNominatim(lat: number, lng: number) {
   const response = await fetch(url, {
     headers: {
       Accept: "application/json",
-      "User-Agent": "checkinout/0.1 contact: bnow0325-Master/checkinout",
+      "User-Agent": "bnow-hr/0.1 contact: bnow0325-Master/HR",
     },
     cache: "no-store",
   });
