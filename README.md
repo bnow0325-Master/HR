@@ -64,6 +64,10 @@ WorkBoard의 `인사관리` 버튼은 현재 Supabase 로그인 토큰을 URL fr
 발급합니다. 출퇴근, 기록부, 휴가, 출장 API는 클라이언트가 보낸 직원 ID가 아닌
 이 서버 세션의 직원만 사용합니다.
 
+HR 직원용 화면을 직접 열었거나 세션이 만료된 경우 WorkBoard의
+`hr-login.html`로 이동해 기존 로그인 세션을 다시 확인한 뒤 원래 HR 메뉴로
+자동 복귀합니다. 모든 HR 화면 상단에는 현재 로그인 직원명과 부서를 표시합니다.
+
 - `WORKBOARD_SUPABASE_URL`: WorkBoard Supabase 프로젝트 URL
 - `WORKBOARD_SUPABASE_ANON_KEY`: Supabase 공개 키
 - `WORKBOARD_SSO_SECRET`: HR 세션 서명용 32바이트 이상 비밀키
