@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import AdminNavLink from "@/components/AdminNavLink";
 import WorkboardUserStatus from "@/components/WorkboardUserStatus";
 
 const navItems = [
   {
     href: "/check",
     label: "출퇴근",
-    matches: ["/check", "/records", "/admin"],
+    matches: ["/check", "/records"],
   },
   {
     href: "/leave",
@@ -19,11 +20,6 @@ const navItems = [
     href: "/business-trips",
     label: "출장관리",
     matches: ["/business-trips"],
-  },
-  {
-    href: "/admin/employees",
-    label: "명부관리",
-    matches: ["/admin/employees"],
   },
 ];
 
@@ -122,6 +118,7 @@ export default function TopNav() {
                   </li>
                 );
               })}
+              <AdminNavLink />
             </ul>
           </nav>
         </div>
