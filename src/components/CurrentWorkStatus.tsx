@@ -13,7 +13,6 @@ type WorkStatus = {
   checkOut: Date | null;
 };
 
-const DEVELOPMENT_EMPLOYEE_ID = "development-chu-dong-hyeon";
 const DEVELOPMENT_RECORDS_KEY = "checkinoutDevelopmentRecords";
 
 function kstDate(date: Date) {
@@ -106,12 +105,8 @@ export default function CurrentWorkStatus({
         return;
       }
 
-      const employeeId =
-        window.sessionStorage.getItem("workboardEmployeeId") ?? "";
-      if (!employeeId || employeeId === DEVELOPMENT_EMPLOYEE_ID) return;
-
       const params = new URLSearchParams({
-        employeeId,
+        mine: "1",
         date: kstDate(new Date()),
       });
       const response = await fetch(`/api/attendance?${params}`, {

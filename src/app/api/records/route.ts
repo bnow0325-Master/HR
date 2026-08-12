@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 type RecordsBody = {
-  employeeId?: string;
   month?: string;
 };
 
@@ -124,15 +124,17 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!body.employeeId) {
+  const authenticatedEmployee =
+    await getCurrentWorkboardEmployee("attendance");
+  if (!authenticatedEmployee) {
     return NextResponse.json(
-      { error: "직원을 선택해 주세요." },
-      { status: 400 },
+      { error: "워크보드 로그인 또는 출퇴근 사용 권한이 필요합니다." },
+      { status: 401 },
     );
   }
 
   const requester = await prisma.employee.findUnique({
-    where: { id: body.employeeId },
+    where: { id: authenticatedEmployee.id },
     select: {
       id: true,
       code: true,

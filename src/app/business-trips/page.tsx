@@ -142,22 +142,10 @@ export default function BusinessTripsPage() {
       return;
     }
 
-    const employeeId =
-      window.sessionStorage.getItem("workboardEmployeeId") ?? "";
-    if (!employeeId) {
-      setMessage({
-        ok: false,
-        text: "워크보드 로그인 사용자 정보를 확인하지 못했습니다.",
-      });
-      setLoading(false);
-      return;
-    }
-
     try {
-      const response = await fetch(
-        `/api/business-trips?employeeId=${employeeId}`,
-        { cache: "no-store" },
-      );
+      const response = await fetch("/api/business-trips", {
+        cache: "no-store",
+      });
       const data = await response.json();
       if (!response.ok) {
         setMessage({
@@ -239,7 +227,6 @@ export default function BusinessTripsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          employeeId: employee.id,
           startDate,
           endDate,
           reason,

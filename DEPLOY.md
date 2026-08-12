@@ -17,7 +17,7 @@
 1. 기능 브랜치에서 `npm run check`를 통과시킨다.
 2. PR을 `main`에 병합한다.
 3. Git 추적 파일만 서버 `/opt/bnow/checkinout`에 반영한다.
-4. 서버의 `.env.production.local`이 보존됐는지 확인한다.
+4. 서버의 `.env.production.local`이 보존됐고 WorkBoard SSO 환경변수가 있는지 확인한다.
 5. `docker compose -f compose.production.yml up -d --build`를 실행한다.
 6. 컨테이너 헬스와 DB 마이그레이션을 확인한다.
 7. HTTPS 주요 화면과 API를 검증한다.
@@ -32,11 +32,13 @@ https://hr.bnow.co.kr/leave
 https://hr.bnow.co.kr/business-trips
 https://hr.bnow.co.kr/admin/login
 https://hr.bnow.co.kr/api/employees
+https://hr.bnow.co.kr/api/auth/workboard/me
 ```
 
 ## 비밀값
 
-`DATABASE_URL`, `ADMIN_PASSWORD`, `QR_TOTP_SECRET`, 내부 API 토큰 등은 서버의
+`DATABASE_URL`, `ADMIN_PASSWORD`, `QR_TOTP_SECRET`, `WORKBOARD_SSO_SECRET`,
+`WORKBOARD_SUPABASE_SERVICE_ROLE_KEY`, 내부 API 토큰 등은 서버의
 `/opt/bnow/checkinout/.env.production.local`에만 저장하고 Git에 기록하지 않습니다.
 
 ## 롤백

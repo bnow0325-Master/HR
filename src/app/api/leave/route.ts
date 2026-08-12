@@ -6,9 +6,9 @@ import {
   startOfKstDate,
   statutoryAnnualLeaveDays,
 } from "@/lib/annualLeave";
+import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 
 type LeaveBody = {
-  employeeId?: string;
   leaveType?: "ANNUAL" | "AM_HALF" | "PM_HALF";
   leaveDate?: string;
   reason?: string;
@@ -99,15 +99,16 @@ async function buildSummary(employeeId: string) {
 }
 
 export async function GET(req: Request) {
-  const employeeId = new URL(req.url).searchParams.get("employeeId") ?? "";
-  if (!employeeId) {
+  void req;
+  const authenticatedEmployee = await getCurrentWorkboardEmployee("leave");
+  if (!authenticatedEmployee) {
     return NextResponse.json(
-      { error: "직원 정보가 필요합니다." },
-      { status: 400 },
+      { error: "워크보드 로그인 또는 휴가 사용 권한이 필요합니다." },
+      { status: 401 },
     );
   }
 
-  const result = await buildSummary(employeeId);
+  const result = await buildSummary(authenticatedEmployee.id);
   if ("error" in result) {
     return NextResponse.json(
       { error: result.error },
@@ -126,10 +127,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const { employeeId, leaveType } = body;
+  const authenticatedEmployee = await getCurrentWorkboardEmployee("leave");
+  if (!authenticatedEmployee) {
+    return NextResponse.json(
+      { error: "워크보드 로그인 또는 휴가 사용 권한이 필요합니다." },
+      { status: 401 },
+    );
+  }
+
+  const employeeId = authenticatedEmployee.id;
+  const { leaveType } = body;
   const leaveDate = startOfKstDate(body.leaveDate ?? "");
   if (
-    !employeeId ||
     !leaveDate ||
     !leaveType ||
     !["ANNUAL", "AM_HALF", "PM_HALF"].includes(leaveType)

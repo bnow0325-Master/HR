@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import CurrentWorkStatus from "@/components/CurrentWorkStatus";
 
 type Employee = {
@@ -165,7 +164,6 @@ function formatCancelRemaining(milliseconds: number) {
 }
 
 function CheckPageContent() {
-  const searchParams = useSearchParams();
   const isDevelopment = process.env.NODE_ENV === "development";
   const [employees, setEmployees] = useState<Employee[]>(
     isDevelopment ? [DEVELOPMENT_EMPLOYEE] : [],
@@ -188,79 +186,38 @@ function CheckPageContent() {
   const [cancelClock, setCancelClock] = useState(() => Date.now());
   const [statusRefreshKey, setStatusRefreshKey] = useState(0);
 
-  const requestedEmployeeName = useMemo(
-    () => searchParams.get("name")?.trim() ?? "",
-    [searchParams],
-  );
-  const requestedEmployeeEmail = useMemo(
-    () => searchParams.get("email")?.trim() ?? "",
-    [searchParams],
-  );
-  const developmentEmployeeName =
-    process.env.NODE_ENV === "development" ? "추동현" : "";
-  const effectiveEmployeeName =
-    requestedEmployeeName || developmentEmployeeName;
-
   useEffect(() => {
     if (isDevelopment) {
       setEmployees(loadDevelopmentEmployees());
       return;
     }
 
-    const storedEmployeeId =
-      window.sessionStorage.getItem("workboardEmployeeId") ?? "";
-    const params = new URLSearchParams();
-
-    if (requestedEmployeeEmail) {
-      params.set("email", requestedEmployeeEmail);
-    } else if (requestedEmployeeName) {
-      params.set("name", requestedEmployeeName);
-    } else if (storedEmployeeId) {
-      params.set("employeeId", storedEmployeeId);
-    }
-
-    fetch(`/api/employees${params.size > 0 ? `?${params}` : ""}`)
-      .then((response) => {
+    fetch("/api/employees", { cache: "no-store" })
+      .then(async (response) => {
         if (!response.ok) {
-          throw new Error("직원 목록을 불러오지 못했습니다.");
+          const data = await response.json();
+          throw new Error(
+            data.error ?? "워크보드 로그인 사용자를 불러오지 못했습니다.",
+          );
         }
         return response.json();
       })
       .then((data) => {
         setEmployees((data.employees ?? []) as Employee[]);
       })
-      .catch(() => {
+      .catch((error: Error) => {
         setEmployees([]);
+        setEmployeeError(error.message);
       });
-  }, [isDevelopment, requestedEmployeeEmail, requestedEmployeeName]);
+  }, [isDevelopment]);
 
   useEffect(() => {
     if (employees.length === 0) return;
 
-    const storedEmployeeId =
-      window.sessionStorage.getItem("workboardEmployeeId") ?? "";
-    const matched =
-      employees.find((employee) => employee.id === storedEmployeeId) ??
-      employees.find(
-        (employee) => employee.name.trim() === effectiveEmployeeName,
-      ) ??
-      (requestedEmployeeEmail && employees.length === 1
-        ? employees[0]
-        : undefined);
+    const matched = employees[0];
 
     if (!matched) {
-      if (requestedEmployeeEmail || effectiveEmployeeName) {
-        setEmployeeError(
-          "워크보드 로그인 정보와 일치하는 재직 직원을 찾지 못했습니다.",
-        );
-        return;
-      }
-
-      if (!employeeId) {
-        setEmployeeError(
-          "워크보드 로그인 사용자 정보가 없어 직원을 자동으로 찾지 못했습니다.",
-        );
-      }
+      setEmployeeError("워크보드에서 인사관리를 다시 열어 주세요.");
       return;
     }
 
@@ -268,12 +225,7 @@ function CheckPageContent() {
     setEmployeeError("");
     window.sessionStorage.setItem("workboardEmployeeName", matched.name);
     window.sessionStorage.setItem("workboardEmployeeId", matched.id);
-  }, [
-    effectiveEmployeeName,
-    employeeId,
-    employees,
-    requestedEmployeeEmail,
-  ]);
+  }, [employees]);
 
   async function resolveAddress(lat: number, lng: number) {
     setAddress({ status: "loading" });
@@ -389,10 +341,7 @@ function CheckPageContent() {
     async function loadAttendanceStatus() {
       setAttendanceStatus((current) => ({ ...current, loading: true }));
       try {
-        const params = new URLSearchParams({
-          employeeId,
-          latest: "1",
-        });
+        const params = new URLSearchParams({ latest: "1" });
         const response = await fetch(`/api/attendance?${params}`, {
           cache: "no-store",
         });
@@ -608,7 +557,6 @@ function CheckPageContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          employeeId,
           type,
           latitude,
           longitude,
@@ -727,7 +675,6 @@ function CheckPageContent() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            employeeId,
             action: "CANCEL_OUT",
           }),
         });
@@ -807,7 +754,9 @@ function CheckPageContent() {
           <div className="font-semibold text-slate-800">
             {currentEmployee
               ? `${currentEmployee.name} (${currentEmployee.code})`
-              : effectiveEmployeeName || "사용자 정보 없음"}
+              : isDevelopment
+                ? DEVELOPMENT_EMPLOYEE.name
+                : "사용자 정보 없음"}
           </div>
           <div className="mt-1 text-slate-500">
             {currentEmployee?.department ?? "부서 정보 없음"}
@@ -929,15 +878,5 @@ function CheckPageContent() {
 }
 
 export default function CheckPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="mx-auto flex min-h-full max-w-md items-center justify-center px-6 py-8 text-sm text-slate-500">
-          출퇴근 화면을 불러오는 중입니다.
-        </main>
-      }
-    >
-      <CheckPageContent />
-    </Suspense>
-  );
+  return <CheckPageContent />;
 }

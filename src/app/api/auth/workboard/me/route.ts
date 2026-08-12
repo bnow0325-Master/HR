@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 
-// 직원 선택값을 받지 않고 검증된 워크보드 세션의 본인 정보만 반환한다.
 export async function GET() {
   const employee = await getCurrentWorkboardEmployee();
   if (!employee) {
@@ -11,5 +10,5 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json({ employees: [employee] });
+  return NextResponse.json({ employee });
 }
