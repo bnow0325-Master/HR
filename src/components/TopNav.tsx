@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import WorkboardUserStatus from "@/components/WorkboardUserStatus";
 
 const navItems = [
@@ -31,7 +31,17 @@ const hiddenPrefixes = ["/kiosk", "/auth/workboard"];
 
 export default function TopNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const isAttendanceHome = pathname === "/" || pathname === "/attendance";
+
+  function handleBack() {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push("/attendance");
+  }
 
   if (hiddenPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     return null;
@@ -40,12 +50,34 @@ export default function TopNav() {
   return (
     <header className="top-nav">
       <div className="top-nav-inner">
-        <Link
-          href="https://bnow0325-master.github.io/workboard/"
-          className="top-nav-workboard"
-        >
-          BNOW WORKBOARD
-        </Link>
+        <div className="top-nav-left">
+          <button
+            type="button"
+            className="top-nav-back"
+            onClick={handleBack}
+            aria-label="이전 화면으로 돌아가기"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            <span>뒤로가기</span>
+          </button>
+
+          <Link
+            href="https://bnow0325-master.github.io/workboard/"
+            className="top-nav-workboard"
+          >
+            BNOW WORKBOARD
+          </Link>
+        </div>
 
         <Link
           href="/attendance"
