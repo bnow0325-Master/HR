@@ -469,6 +469,21 @@ textarea:focus {
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);
 }
 
+.top-nav-admin-link {
+  border: 1px solid #0f172a;
+  color: #0f172a;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.top-nav-admin-link:hover,
+.top-nav-admin-link.is-active {
+  border-color: #0f172a;
+  background: #0f172a;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
+}
+
 .top-nav-user {
   display: inline-flex;
   flex: 0 0 auto;
