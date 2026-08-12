@@ -14,6 +14,7 @@ type BasicEmployeeRow = {
   code: string;
   name: string;
   department: string | null;
+  active: boolean;
 };
 
 type ContractEmployeeRow = BasicEmployeeRow & {
@@ -21,6 +22,7 @@ type ContractEmployeeRow = BasicEmployeeRow & {
   email: string | null;
   phone: string | null;
   hireDate: Date | string | null;
+  terminationDate: Date | string | null;
 };
 
 const CONTRACT_DIRECTORY_COLUMNS = [
@@ -28,6 +30,7 @@ const CONTRACT_DIRECTORY_COLUMNS = [
   "email",
   "phone",
   "hireDate",
+  "terminationDate",
 ] as const;
 
 function responseHeaders() {
@@ -56,28 +59,49 @@ async function supportsContractDirectoryFields(): Promise<boolean> {
   return CONTRACT_DIRECTORY_COLUMNS.every((column) => available.has(column));
 }
 
-async function listContractEmployees(): Promise<ContractEmployeeRow[]> {
+async function listContractEmployees(
+  includeInactive: boolean,
+): Promise<ContractEmployeeRow[]> {
   if (await supportsContractDirectoryFields()) {
-    return prisma.$queryRaw<ContractEmployeeRow[]>`
-      SELECT
-        "id",
-        "code",
-        "name",
-        "department",
-        "position",
-        "email",
-        "phone",
-        "hireDate"
-      FROM "Employee"
-      WHERE "active" = true
-      ORDER BY "code" ASC
-      LIMIT 500
-    `;
+    return includeInactive
+      ? prisma.$queryRaw<ContractEmployeeRow[]>`
+          SELECT
+            "id",
+            "code",
+            "name",
+            "department",
+            "position",
+            "email",
+            "phone",
+            "hireDate",
+            "terminationDate",
+            "active"
+          FROM "Employee"
+          ORDER BY "code" ASC
+          LIMIT 500
+        `
+      : prisma.$queryRaw<ContractEmployeeRow[]>`
+          SELECT
+            "id",
+            "code",
+            "name",
+            "department",
+            "position",
+            "email",
+            "phone",
+            "hireDate",
+            "terminationDate",
+            "active"
+          FROM "Employee"
+          WHERE "active" = true
+          ORDER BY "code" ASC
+          LIMIT 500
+        `;
   }
 
   const employees = await prisma.employee.findMany({
-    where: { active: true },
-    select: { id: true, code: true, name: true, department: true },
+    where: includeInactive ? undefined : { active: true },
+    select: { id: true, code: true, name: true, department: true, active: true },
     orderBy: { code: "asc" },
     take: 500,
   });
@@ -87,6 +111,7 @@ async function listContractEmployees(): Promise<ContractEmployeeRow[]> {
     email: null,
     phone: null,
     hireDate: null,
+    terminationDate: null,
   }));
 }
 
@@ -104,12 +129,15 @@ export async function GET(request: Request) {
     );
   }
 
-  const employees = await listContractEmployees();
+  const includeInactive =
+    new URL(request.url).searchParams.get("includeInactive") === "1";
+  const employees = await listContractEmployees(includeInactive);
   return NextResponse.json(
     {
       employees: employees.map((employee) => ({
         ...employee,
         hireDate: dateOnly(employee.hireDate),
+        terminationDate: dateOnly(employee.terminationDate),
       })),
     },
     { headers: responseHeaders() },

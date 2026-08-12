@@ -70,5 +70,12 @@ PR을 `main`에 병합한 뒤 [deploy/README.md](./deploy/README.md)의 자체 �
 - `LeaveRequest`: 휴가 신청과 승인 상태
 - `BusinessTrip`: 출장 기간, 사유, 출장일지
 
+## 내부 직원명부 연동
+
+전자계약 등 내부 시스템은 Bearer 인증이 적용된
+`GET /api/internal/employee-directory`를 통해 HR 명부를 조회합니다. 기본 응답은
+재직자만 포함하며, 관리자용 전체 동기화는 `includeInactive=1`을 사용해 퇴사일과
+재직 상태까지 전달합니다. 연동 토큰은 서버 환경변수에만 저장합니다.
+
 개발 규칙은 [AGENTS.md](./AGENTS.md), 배포 요약은 [DEPLOY.md](./DEPLOY.md)를
 참고합니다.
