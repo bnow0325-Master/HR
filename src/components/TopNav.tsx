@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import WorkboardUserStatus from "@/components/WorkboardUserStatus";
 
 const navItems = [
   {
@@ -26,7 +27,7 @@ const navItems = [
   },
 ];
 
-const hiddenPrefixes = ["/kiosk"];
+const hiddenPrefixes = ["/kiosk", "/auth/workboard"];
 
 export default function TopNav() {
   const pathname = usePathname();
@@ -50,28 +51,31 @@ export default function TopNav() {
           인사관리
         </Link>
 
-        <nav aria-label="주요 메뉴" className="top-nav-actions">
-          <ul>
-            {navItems.map((item) => {
-              const isActive = item.matches.some((prefix) =>
-                prefix === "/" || prefix === "/admin"
-                  ? pathname === prefix
-                  : pathname.startsWith(prefix),
-              );
+        <div className="top-nav-right">
+          <WorkboardUserStatus />
+          <nav aria-label="주요 메뉴" className="top-nav-actions">
+            <ul>
+              {navItems.map((item) => {
+                const isActive = item.matches.some((prefix) =>
+                  prefix === "/" || prefix === "/admin"
+                    ? pathname === prefix
+                    : pathname.startsWith(prefix),
+                );
 
-              return (
-                <li key={item.href} className="list-none">
-                  <Link
-                    href={item.href}
-                    className={`top-nav-link ${isActive ? "is-active" : ""}`}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+                return (
+                  <li key={item.href} className="list-none">
+                    <Link
+                      href={item.href}
+                      className={`top-nav-link ${isActive ? "is-active" : ""}`}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        </div>
       </div>
     </header>
   );
