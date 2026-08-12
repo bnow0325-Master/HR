@@ -19,6 +19,7 @@ BNOW 임직원의 출퇴근, 근무기록, 휴가, 출장, 직원명부를 통�
 - 휴가 신청, 연차 현황, 신청 내역 관리
 - 출장 기간·사유·출장일지 관리
 - 직원명부, 입·퇴사 상태, 인사관리 및 WorkBoard 권한 관리
+- WorkBoard 로그인 사용자를 검증해 전 메뉴에서 동일한 직원으로 자동 연결
 
 ## 화면 구성
 
@@ -33,6 +34,7 @@ BNOW 임직원의 출퇴근, 근무기록, 휴가, 출장, 직원명부를 통�
 | `/admin/employees` | 직원명부와 권한 관리 |
 | `/admin/login` | 관리자 로그인 |
 | `/kiosk` | 선택형 QR 키오스크 화면 |
+| `/auth/workboard` | WorkBoard 로그인 검증 및 HR 세션 연결 |
 
 ## 기술 스택
 
@@ -53,6 +55,21 @@ npm run dev
 
 운영·로컬 환경변수는 Git에서 제외된 `.env` 또는 `.env.production.local`에만
 저장합니다.
+
+## WorkBoard 로그인 연동
+
+WorkBoard의 `인사관리` 버튼은 현재 Supabase 로그인 토큰을 URL fragment로 HR에
+전달합니다. HR 서버는 Supabase에서 토큰을 검증한 뒤 이메일이 일치하고
+`active`, `workboardEnabled`가 활성화된 직원에게만 서명된 HttpOnly 세션을
+발급합니다. 출퇴근, 기록부, 휴가, 출장 API는 클라이언트가 보낸 직원 ID가 아닌
+이 서버 세션의 직원만 사용합니다.
+
+- `WORKBOARD_SUPABASE_URL`: WorkBoard Supabase 프로젝트 URL
+- `WORKBOARD_SUPABASE_ANON_KEY`: Supabase 공개 키
+- `WORKBOARD_SSO_SECRET`: HR 세션 서명용 32바이트 이상 비밀키
+- `WORKBOARD_SUPABASE_SERVICE_ROLE_KEY`: 직원명부 권한 동기화용 서버 키
+
+비밀키와 토큰은 Git에 커밋하지 않습니다.
 
 ## 검사와 배포
 

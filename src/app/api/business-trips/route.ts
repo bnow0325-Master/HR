@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { startOfKstDate } from "@/lib/annualLeave";
+import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 
 type BusinessTripBody = {
-  employeeId?: string;
   startDate?: string;
   endDate?: string;
   reason?: string;
@@ -30,13 +30,15 @@ const employeeSelect = {
 } as const;
 
 export async function GET(req: Request) {
-  const employeeId = new URL(req.url).searchParams.get("employeeId") ?? "";
-  if (!employeeId) {
+  void req;
+  const authenticatedEmployee = await getCurrentWorkboardEmployee("leave");
+  if (!authenticatedEmployee) {
     return NextResponse.json(
-      { error: "직원 정보가 필요합니다." },
-      { status: 400 },
+      { error: "워크보드 로그인 또는 출장 사용 권한이 필요합니다." },
+      { status: 401 },
     );
   }
+  const employeeId = authenticatedEmployee.id;
 
   const employee = await prisma.employee.findUnique({
     where: { id: employeeId },
@@ -66,12 +68,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const employeeId = body.employeeId?.trim() ?? "";
+  const authenticatedEmployee = await getCurrentWorkboardEmployee("leave");
+  if (!authenticatedEmployee) {
+    return NextResponse.json(
+      { error: "워크보드 로그인 또는 출장 사용 권한이 필요합니다." },
+      { status: 401 },
+    );
+  }
+  const employeeId = authenticatedEmployee.id;
   const startDate = startOfKstDate(body.startDate ?? "");
   const endDate = startOfKstDate(body.endDate ?? "");
   const reason = body.reason?.trim() ?? "";
 
-  if (!employeeId || !startDate || !endDate || !reason) {
+  if (!startDate || !endDate || !reason) {
     return NextResponse.json(
       { error: "출장 시작일, 종료일과 출장 사유를 입력해 주세요." },
       { status: 400 },

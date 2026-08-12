@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Employee = {
   id: string;
@@ -196,7 +195,6 @@ function buildDevelopmentRecords(
 }
 
 function RecordsPageContent() {
-  const searchParams = useSearchParams();
   const isDevelopment = process.env.NODE_ENV === "development";
   const [employees, setEmployees] = useState<Employee[]>(
     isDevelopment ? [DEVELOPMENT_EMPLOYEE] : [],
@@ -211,54 +209,33 @@ function RecordsPageContent() {
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const requestedEmployeeName = useMemo(
-    () => searchParams.get("name")?.trim() ?? "",
-    [searchParams],
-  );
-
   useEffect(() => {
     if (isDevelopment) {
       setEmployees(loadDevelopmentEmployees());
       return;
     }
 
-    fetch("/api/employees")
-      .then((response) => {
+    fetch("/api/employees", { cache: "no-store" })
+      .then(async (response) => {
         if (!response.ok) {
-          throw new Error("직원 목록을 불러오지 못했습니다.");
+          const data = await response.json();
+          throw new Error(data.error ?? "직원 정보를 불러오지 못했습니다.");
         }
         return response.json();
       })
       .then((data) => {
         setEmployees((data.employees ?? []) as Employee[]);
       })
-      .catch(() => {
+      .catch((loadError: Error) => {
         setEmployees([]);
+        setError(loadError.message);
       });
   }, [isDevelopment]);
 
   useEffect(() => {
     if (employees.length === 0) return;
 
-    const storedEmployeeId =
-      window.sessionStorage.getItem("workboardEmployeeId") ?? "";
-    const storedEmployeeName =
-      window.sessionStorage.getItem("workboardEmployeeName") ?? "";
-    const effectiveEmployeeName =
-      requestedEmployeeName ||
-      storedEmployeeName ||
-      (isDevelopment ? DEVELOPMENT_EMPLOYEE.name : "");
-
-    const matchedById = employees.find(
-      (employee) => employee.id === storedEmployeeId,
-    );
-    const matchedByName = employees.find(
-      (employee) => employee.name.trim() === effectiveEmployeeName.trim(),
-    );
-    const matched =
-      matchedById ??
-      matchedByName ??
-      (isDevelopment ? DEVELOPMENT_EMPLOYEE : null);
+    const matched = employees[0] ?? null;
 
     if (!matched) {
       setError("로그인한 사용자의 기록을 찾지 못했습니다.");
@@ -269,7 +246,7 @@ function RecordsPageContent() {
     setError("");
     window.sessionStorage.setItem("workboardEmployeeName", matched.name);
     window.sessionStorage.setItem("workboardEmployeeId", matched.id);
-  }, [employees, isDevelopment, requestedEmployeeName]);
+  }, [employees]);
 
   useEffect(() => {
     if (!employeeId) return;
@@ -292,7 +269,7 @@ function RecordsPageContent() {
         const response = await fetch("/api/records", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ employeeId, month }),
+          body: JSON.stringify({ month }),
         });
         const data = (await response.json()) as RecordsResponse;
         if (cancelled) return;
@@ -476,15 +453,5 @@ function RecordsPageContent() {
 }
 
 export default function RecordsPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="mx-auto flex min-h-full max-w-5xl items-center justify-center px-6 py-8 text-sm text-slate-500">
-          출퇴근 기록부를 불러오는 중입니다.
-        </main>
-      }
-    >
-      <RecordsPageContent />
-    </Suspense>
-  );
+  return <RecordsPageContent />;
 }

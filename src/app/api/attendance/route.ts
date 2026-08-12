@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isWithinOffice } from "@/lib/location";
+import { isAdmin } from "@/lib/adminAuth";
+import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 
 type CheckBody = {
-  employeeId?: string;
   action?: "CANCEL_OUT";
   type?: "IN" | "OUT";
   latitude?: number;
@@ -47,25 +48,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const { employeeId, action, type, latitude, longitude } = body;
+  const { action, type, latitude, longitude } = body;
   const address = body.address?.trim() || null;
 
-  if (!employeeId) {
+  const authenticatedEmployee =
+    await getCurrentWorkboardEmployee("attendance");
+  if (!authenticatedEmployee) {
     return NextResponse.json(
-      { error: "직원 정보가 필요합니다." },
-      { status: 400 },
+      { error: "워크보드 로그인 또는 출퇴근 사용 권한이 필요합니다." },
+      { status: 401 },
     );
   }
-
-  const employee = await prisma.employee.findUnique({
-    where: { id: employeeId },
-  });
-  if (!employee || !employee.active || !employee.attendanceEnabled) {
-    return NextResponse.json(
-      { error: "출퇴근 사용 권한이 없습니다." },
-      { status: 403 },
-    );
-  }
+  const employeeId = authenticatedEmployee.id;
 
   const todayRange = kstDayRange(currentKstDate());
   if (!todayRange) {
@@ -222,15 +216,54 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const date = searchParams.get("date");
-  const employeeId = searchParams.get("employeeId");
   const latestOnly = searchParams.get("latest") === "1";
+  const mineOnly = searchParams.get("mine") === "1";
 
-  if (latestOnly && employeeId) {
+  if (latestOnly || mineOnly) {
+    const authenticatedEmployee =
+      await getCurrentWorkboardEmployee("attendance");
+    if (!authenticatedEmployee) {
+      return NextResponse.json(
+        { error: "워크보드 로그인 또는 출퇴근 사용 권한이 필요합니다." },
+        { status: 401 },
+      );
+    }
+    const authenticatedEmployeeId = authenticatedEmployee.id;
+
+    if (!latestOnly) {
+      const where: Record<string, unknown> = {
+        employeeId: authenticatedEmployeeId,
+        cancelledAt: null,
+      };
+      if (date) {
+        const range = kstDayRange(date);
+        if (!range) {
+          return NextResponse.json(
+            { error: "날짜 형식이 올바르지 않습니다." },
+            { status: 400 },
+          );
+        }
+        where.timestamp = { gte: range.start, lt: range.end };
+      }
+
+      const records = await prisma.attendanceRecord.findMany({
+        where,
+        include: {
+          employee: {
+            select: { name: true, code: true, department: true },
+          },
+        },
+        orderBy: { timestamp: "desc" },
+        take: 200,
+      });
+      return NextResponse.json({ records });
+    }
+
     const todayRange = kstDayRange(currentKstDate());
     const todayRecords = todayRange
       ? await prisma.attendanceRecord.findMany({
           where: {
-            employeeId,
+            employeeId: authenticatedEmployeeId,
             cancelledAt: null,
             timestamp: { gte: todayRange.start, lt: todayRange.end },
           },
@@ -262,8 +295,14 @@ export async function GET(req: Request) {
     });
   }
 
+  if (!(await isAdmin())) {
+    return NextResponse.json(
+      { error: "관리자 로그인이 필요합니다." },
+      { status: 401 },
+    );
+  }
+
   const where: Record<string, unknown> = { cancelledAt: null };
-  if (employeeId) where.employeeId = employeeId;
   if (date) {
     const range = kstDayRange(date);
     if (!range) {
