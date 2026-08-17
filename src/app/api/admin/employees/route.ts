@@ -5,6 +5,7 @@ import { syncWorkboardMember } from "@/lib/workboardMembers";
 import {
   employeeSelect,
   parseDateOnly,
+  validContactPhone,
   validEmail,
   validPhone,
 } from "@/lib/employeeData";
@@ -16,6 +17,9 @@ type EmployeeBody = {
   position?: string;
   email?: string;
   phone?: string;
+  personalEmail?: string;
+  homeAddress?: string;
+  emergencyContactPhone?: string;
   hireDate?: string;
   terminationDate?: string;
   workMinutesPerDay?: number;
@@ -62,6 +66,9 @@ export async function POST(req: Request) {
   const position = body.position?.trim() || null;
   const email = body.email?.trim().toLowerCase() || null;
   const phone = body.phone?.trim() || null;
+  const personalEmail = body.personalEmail?.trim().toLowerCase() || null;
+  const homeAddress = body.homeAddress?.trim() || null;
+  const emergencyContactPhone = body.emergencyContactPhone?.trim() || null;
   const hireDate = parseDateOnly(body.hireDate);
   const terminationDate = body.terminationDate
     ? parseDateOnly(body.terminationDate)
@@ -98,9 +105,27 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  if (!validEmail(personalEmail)) {
+    return NextResponse.json(
+      { error: "개인 이메일 형식이 올바르지 않습니다." },
+      { status: 400 },
+    );
+  }
   if (!validPhone(phone)) {
     return NextResponse.json(
       { error: "휴대폰번호는 010-0000-0000 형식으로 입력해 주세요." },
+      { status: 400 },
+    );
+  }
+  if (!validContactPhone(emergencyContactPhone)) {
+    return NextResponse.json(
+      { error: "비상연락망 연락처를 하이픈이 포함된 전화번호 형식으로 입력해 주세요." },
+      { status: 400 },
+    );
+  }
+  if (homeAddress && homeAddress.length > 300) {
+    return NextResponse.json(
+      { error: "현재 거주지 주소는 300자 이내로 입력해 주세요." },
       { status: 400 },
     );
   }
@@ -110,9 +135,19 @@ export async function POST(req: Request) {
       OR: [
         { code },
         ...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : []),
+        ...(personalEmail
+          ? [
+              {
+                personalEmail: {
+                  equals: personalEmail,
+                  mode: "insensitive" as const,
+                },
+              },
+            ]
+          : []),
       ],
     },
-    select: { code: true, email: true },
+    select: { code: true, email: true, personalEmail: true },
   });
   if (duplicate) {
     return NextResponse.json(
@@ -120,7 +155,9 @@ export async function POST(req: Request) {
         error:
           duplicate.code === code
             ? "이미 등록된 사번입니다."
-            : "이미 등록된 이메일입니다.",
+            : duplicate.email?.toLowerCase() === email
+              ? "이미 등록된 회사 이메일입니다."
+              : "이미 등록된 개인 이메일입니다.",
       },
       { status: 409 },
     );
@@ -134,6 +171,9 @@ export async function POST(req: Request) {
       position,
       email,
       phone,
+      personalEmail,
+      homeAddress,
+      emergencyContactPhone,
       hireDate,
       terminationDate,
       workMinutesPerDay,

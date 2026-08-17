@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/adminAuth";
 import {
   employeeSelect,
   parseDateOnly,
+  validContactPhone,
   validEmail,
   validPhone,
 } from "@/lib/employeeData";
@@ -16,6 +17,9 @@ type UpdateEmployeeBody = {
   position?: string | null;
   email?: string | null;
   phone?: string | null;
+  personalEmail?: string | null;
+  homeAddress?: string | null;
+  emergencyContactPhone?: string | null;
   hireDate?: string;
   terminationDate?: string | null;
   workMinutesPerDay?: number;
@@ -66,6 +70,9 @@ export async function PATCH(
     position?: string | null;
     email?: string | null;
     phone?: string | null;
+    personalEmail?: string | null;
+    homeAddress?: string | null;
+    emergencyContactPhone?: string | null;
     hireDate?: Date;
     terminationDate?: Date | null;
     workMinutesPerDay?: number;
@@ -107,6 +114,37 @@ export async function PATCH(
       );
     }
     data.phone = phone;
+  }
+  if (body.personalEmail !== undefined) {
+    const personalEmail = body.personalEmail?.trim().toLowerCase() || null;
+    if (!validEmail(personalEmail)) {
+      return NextResponse.json(
+        { error: "개인 이메일 형식이 올바르지 않습니다." },
+        { status: 400 },
+      );
+    }
+    data.personalEmail = personalEmail;
+  }
+  if (body.homeAddress !== undefined) {
+    const homeAddress = body.homeAddress?.trim() || null;
+    if (homeAddress && homeAddress.length > 300) {
+      return NextResponse.json(
+        { error: "현재 거주지 주소는 300자 이내로 입력해 주세요." },
+        { status: 400 },
+      );
+    }
+    data.homeAddress = homeAddress;
+  }
+  if (body.emergencyContactPhone !== undefined) {
+    const emergencyContactPhone =
+      body.emergencyContactPhone?.trim() || null;
+    if (!validContactPhone(emergencyContactPhone)) {
+      return NextResponse.json(
+        { error: "비상연락망 연락처를 하이픈이 포함된 전화번호 형식으로 입력해 주세요." },
+        { status: 400 },
+      );
+    }
+    data.emergencyContactPhone = emergencyContactPhone;
   }
   if (body.hireDate !== undefined) {
     const hireDate = optionalDate(body.hireDate);
@@ -194,6 +232,10 @@ export async function PATCH(
   const nextCode = data.code ?? existing.code;
   const nextEmail =
     data.email === undefined ? existing.email : data.email;
+  const nextPersonalEmail =
+    data.personalEmail === undefined
+      ? existing.personalEmail
+      : data.personalEmail;
   if (!nextEmail) {
     data.workboardEnabled = false;
   }
@@ -205,13 +247,26 @@ export async function PATCH(
         ...(nextEmail
           ? [{ email: { equals: nextEmail, mode: "insensitive" as const } }]
           : []),
+        ...(nextPersonalEmail
+          ? [
+              {
+                personalEmail: {
+                  equals: nextPersonalEmail,
+                  mode: "insensitive" as const,
+                },
+              },
+            ]
+          : []),
       ],
     },
     select: { code: true },
   });
   if (duplicate) {
     return NextResponse.json(
-      { error: "동일한 사번 또는 이메일을 사용 중인 직원이 있습니다." },
+      {
+        error:
+          "동일한 사번, 회사 이메일 또는 개인 이메일을 사용 중인 직원이 있습니다.",
+      },
       { status: 409 },
     );
   }

@@ -6,6 +6,9 @@ export const employeeSelect = {
   position: true,
   email: true,
   phone: true,
+  personalEmail: true,
+  homeAddress: true,
+  emergencyContactPhone: true,
   hireDate: true,
   terminationDate: true,
   workMinutesPerDay: true,
@@ -30,4 +33,8 @@ export function validEmail(email: string | null) {
 
 export function validPhone(phone: string | null) {
   return !phone || /^01\d-\d{3,4}-\d{4}$/.test(phone);
+}
+
+export function validContactPhone(phone: string | null) {
+  return !phone || /^0\d{1,3}-\d{3,4}-\d{4}$/.test(phone);
 }
