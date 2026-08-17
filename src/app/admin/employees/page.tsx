@@ -12,6 +12,9 @@ type Employee = {
   position: string | null;
   email: string | null;
   phone: string | null;
+  personalEmail: string | null;
+  homeAddress: string | null;
+  emergencyContactPhone: string | null;
   hireDate: string | null;
   terminationDate: string | null;
   workMinutesPerDay: number;
@@ -29,6 +32,9 @@ type EmployeeDraft = {
   position: string;
   email: string;
   phone: string;
+  personalEmail: string;
+  homeAddress: string;
+  emergencyContactPhone: string;
   hireDate: string;
   terminationDate: string;
   workHoursPerDay: string;
@@ -47,6 +53,9 @@ const DEVELOPMENT_EMPLOYEE: Employee = {
   position: "개발",
   email: null,
   phone: null,
+  personalEmail: null,
+  homeAddress: null,
+  emergencyContactPhone: null,
   hireDate: "2024-01-01",
   terminationDate: null,
   workMinutesPerDay: 480,
@@ -64,6 +73,9 @@ const EMPTY_DRAFT: EmployeeDraft = {
   position: "",
   email: "",
   phone: "",
+  personalEmail: "",
+  homeAddress: "",
+  emergencyContactPhone: "",
   hireDate: "",
   terminationDate: "",
   workHoursPerDay: "8",
@@ -84,6 +96,9 @@ function normalizeEmployee(employee: Partial<Employee>): Employee {
     position: employee.position ?? null,
     email: employee.email ?? null,
     phone: employee.phone ?? null,
+    personalEmail: employee.personalEmail ?? null,
+    homeAddress: employee.homeAddress ?? null,
+    emergencyContactPhone: employee.emergencyContactPhone ?? null,
     hireDate: employee.hireDate ?? null,
     terminationDate: employee.terminationDate ?? null,
     workMinutesPerDay: employee.workMinutesPerDay ?? 480,
@@ -134,6 +149,9 @@ function draftFromEmployee(employee: Employee): EmployeeDraft {
     position: employee.position ?? "",
     email: employee.email ?? "",
     phone: employee.phone ?? "",
+    personalEmail: employee.personalEmail ?? "",
+    homeAddress: employee.homeAddress ?? "",
+    emergencyContactPhone: employee.emergencyContactPhone ?? "",
     hireDate: dateValue(employee.hireDate),
     terminationDate: dateValue(employee.terminationDate),
     workHoursPerDay: String(employee.workMinutesPerDay / 60),
@@ -162,7 +180,18 @@ function parseRoster(text: string) {
       : line.includes("|")
         ? line.split("|")
         : line.split(",");
-    const [code, name, hireDate, terminationDate, phone, email, role] =
+    const [
+      code,
+      name,
+      hireDate,
+      terminationDate,
+      phone,
+      email,
+      role,
+      personalEmail,
+      emergencyContactPhone,
+      homeAddress,
+    ] =
       columns.map((value) => value.trim());
 
     if (!code || !name || code === "사번") return [];
@@ -175,6 +204,11 @@ function parseRoster(text: string) {
         terminationDate: normalizedDate(terminationDate ?? ""),
         phone: phone === "-" ? "" : phone ?? "",
         email: email === "-" ? "" : (email ?? "").toLowerCase(),
+        personalEmail:
+          personalEmail === "-" ? "" : (personalEmail ?? "").toLowerCase(),
+        emergencyContactPhone:
+          emergencyContactPhone === "-" ? "" : emergencyContactPhone ?? "",
+        homeAddress: homeAddress === "-" ? "" : homeAddress ?? "",
         systemRole: role?.toUpperCase() === "ADMIN" ? "ADMIN" : "MEMBER",
         workboardEnabled: Boolean(email && email !== "-"),
       } satisfies EmployeeDraft,
@@ -190,6 +224,9 @@ function employeePayload(draft: EmployeeDraft) {
     position: draft.position.trim(),
     email: draft.email.trim().toLowerCase(),
     phone: draft.phone.trim(),
+    personalEmail: draft.personalEmail.trim().toLowerCase(),
+    homeAddress: draft.homeAddress.trim(),
+    emergencyContactPhone: draft.emergencyContactPhone.trim(),
     hireDate: draft.hireDate,
     terminationDate: draft.terminationDate,
     workMinutesPerDay: Math.round(Number(draft.workHoursPerDay) * 60),
@@ -280,10 +317,15 @@ export default function EmployeesAdminPage() {
           employee.id !== employeeId &&
           (employee.code === payload.code ||
             (payload.email &&
-              employee.email?.toLowerCase() === payload.email)),
+              employee.email?.toLowerCase() === payload.email) ||
+            (payload.personalEmail &&
+              employee.personalEmail?.toLowerCase() ===
+                payload.personalEmail)),
       );
       if (duplicate) {
-        throw new Error("동일한 사번 또는 이메일이 이미 등록되어 있습니다.");
+        throw new Error(
+          "동일한 사번, 회사 이메일 또는 개인 이메일이 이미 등록되어 있습니다.",
+        );
       }
 
       const employee = normalizeEmployee({
@@ -293,6 +335,9 @@ export default function EmployeesAdminPage() {
         position: payload.position || null,
         email: payload.email || null,
         phone: payload.phone || null,
+        personalEmail: payload.personalEmail || null,
+        homeAddress: payload.homeAddress || null,
+        emergencyContactPhone: payload.emergencyContactPhone || null,
         hireDate: payload.hireDate,
         terminationDate: payload.terminationDate || null,
         active: !payload.terminationDate,
@@ -389,7 +434,15 @@ export default function EmployeesAdminPage() {
                   item.email?.toLowerCase() === payload.email,
               )
             : null;
-          if (duplicateEmail) {
+          const duplicatePersonalEmail = payload.personalEmail
+            ? nextEmployees.find(
+                (item) =>
+                  item.id !== existing?.id &&
+                  item.personalEmail?.toLowerCase() ===
+                    payload.personalEmail,
+              )
+            : null;
+          if (duplicateEmail || duplicatePersonalEmail) {
             throw new Error("동일한 이메일이 이미 등록되어 있습니다.");
           }
 
@@ -402,6 +455,9 @@ export default function EmployeesAdminPage() {
             position: payload.position || null,
             email: payload.email || null,
             phone: payload.phone || null,
+            personalEmail: payload.personalEmail || null,
+            homeAddress: payload.homeAddress || null,
+            emergencyContactPhone: payload.emergencyContactPhone || null,
             hireDate: payload.hireDate,
             terminationDate: payload.terminationDate || null,
             active: !payload.terminationDate,
@@ -575,7 +631,7 @@ export default function EmployeesAdminPage() {
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
             />
           </Field>
-          <Field label="메일주소">
+          <Field label="회사 이메일">
             <input
               type="email"
               value={draft.email}
@@ -589,6 +645,33 @@ export default function EmployeesAdminPage() {
                     : false,
                 }));
               }}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="개인 이메일">
+            <input
+              type="email"
+              value={draft.personalEmail}
+              placeholder="name@example.com"
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  personalEmail: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="비상연락망 연락처">
+            <input
+              value={draft.emergencyContactPhone}
+              placeholder="010-0000-0000"
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  emergencyContactPhone: event.target.value,
+                }))
+              }
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
             />
           </Field>
@@ -648,6 +731,22 @@ export default function EmployeesAdminPage() {
               <option value="ADMIN">관리자</option>
             </select>
           </Field>
+          <div className="sm:col-span-2 lg:col-span-4">
+            <Field label="현재 거주지 주소">
+              <input
+                value={draft.homeAddress}
+                maxLength={300}
+                placeholder="현재 거주 중인 주소를 입력해 주세요."
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    homeAddress: event.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              />
+            </Field>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -699,14 +798,17 @@ export default function EmployeesAdminPage() {
           직원 명부 일괄 등록
         </summary>
         <p className="mt-2 text-sm text-slate-500">
-          한 줄에 사번, 이름, 입사일, 퇴사일, 휴대폰, 이메일, 권한 순서로
-          입력합니다. 쉼표나 탭으로 구분할 수 있습니다.
+          한 줄에 사번, 이름, 입사일, 퇴사일, 휴대폰, 회사 이메일, 권한,
+          개인 이메일, 비상연락망, 거주지 주소 순서로 입력합니다. 탭 구분을
+          권장하며 기존 7개 항목 형식도 그대로 사용할 수 있습니다.
         </p>
         <textarea
           value={rosterText}
           onChange={(event) => setRosterText(event.target.value)}
           rows={7}
-          placeholder={"사번,이름,입사일,퇴사일,휴대폰,이메일,권한"}
+          placeholder={
+            "사번\t이름\t입사일\t퇴사일\t휴대폰\t회사이메일\t권한\t개인이메일\t비상연락망\t거주지주소"
+          }
           className="mt-4 w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 font-mono text-sm"
         />
         <button
@@ -737,13 +839,14 @@ export default function EmployeesAdminPage() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[1200px] text-sm">
+          <table className="w-full min-w-[1450px] text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-medium">사번</th>
                 <th className="px-4 py-3 font-medium">직원</th>
                 <th className="px-4 py-3 font-medium">입·퇴사일</th>
-                <th className="px-4 py-3 font-medium">연락처</th>
+                <th className="px-4 py-3 font-medium">회사 연락처</th>
+                <th className="px-4 py-3 font-medium">개인 연락처 · 거주지</th>
                 <th className="px-4 py-3 font-medium">권한</th>
                 <th className="px-4 py-3 font-medium">서비스 사용</th>
                 <th className="px-4 py-3 font-medium">상태</th>
@@ -778,6 +881,18 @@ export default function EmployeesAdminPage() {
                   <td className="px-4 py-3 text-slate-600">
                     <div>{employee.phone ?? "-"}</div>
                     <div className="mt-1 text-xs">{employee.email ?? "-"}</div>
+                  </td>
+                  <td className="max-w-[260px] px-4 py-3 text-slate-600">
+                    <div>{employee.emergencyContactPhone ?? "-"}</div>
+                    <div className="mt-1 text-xs">
+                      {employee.personalEmail ?? "-"}
+                    </div>
+                    <div
+                      className="mt-1 truncate text-xs text-slate-400"
+                      title={employee.homeAddress ?? undefined}
+                    >
+                      {employee.homeAddress ?? "거주지 미등록"}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     {employee.systemRole === "ADMIN" ? "관리자" : "일반 직원"}

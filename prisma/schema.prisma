@@ -14,6 +14,9 @@ model Employee {
   position          String?
   email             String?            @unique
   phone             String?
+  personalEmail     String?            @unique
+  homeAddress       String?
+  emergencyContactPhone String?
   hireDate          DateTime?
   terminationDate   DateTime?
   workMinutesPerDay Int                @default(480)
