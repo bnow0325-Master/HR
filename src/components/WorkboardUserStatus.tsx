@@ -73,11 +73,16 @@ export default function WorkboardUserStatus() {
 
   if (employee) {
     return (
-      <div className="top-nav-user is-signed-in" aria-label="로그인 사용자">
+      <Link
+        href="/profile"
+        className="top-nav-user is-signed-in"
+        aria-label={`${employee.name} 내 정보 관리`}
+        title="내 정보 관리"
+      >
         <span className="top-nav-user-dot" />
         <strong>{employee.name}</strong>
         <span>{employee.department || `사번 ${employee.code}`}</span>
-      </div>
+      </Link>
     );
   }
 

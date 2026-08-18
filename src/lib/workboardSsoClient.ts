@@ -7,6 +7,7 @@ const EMPLOYEE_PATHS = new Set([
   "/records",
   "/leave",
   "/business-trips",
+  "/profile",
 ]);
 
 export function isEmployeePath(pathname: string) {
