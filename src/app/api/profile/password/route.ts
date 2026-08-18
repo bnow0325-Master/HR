@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   }
   if (!workboardAuthConfigured()) {
     return NextResponse.json(
-      { error: "WorkBoard 비밀번호 변경 설정이 완료되지 않았습니다." },
+      { error: "로그인 비밀번호 변경 설정이 완료되지 않았습니다." },
       { status: 503 },
     );
   }
@@ -79,20 +79,20 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "새 비밀번호가 WorkBoard 보안 정책에 맞지 않습니다. 더 복잡한 비밀번호를 입력해 주세요.",
+          "새 비밀번호가 보안 정책에 맞지 않습니다. 더 복잡한 비밀번호를 입력해 주세요.",
       },
       { status: 400 },
     );
   }
   if (!result.ok) {
     return NextResponse.json(
-      { error: "WorkBoard 비밀번호를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요." },
+      { error: "로그인 비밀번호를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요." },
       { status: 502 },
     );
   }
 
   return NextResponse.json({
     ok: true,
-    message: "WorkBoard 비밀번호를 변경했습니다.",
+    message: "로그인 비밀번호를 변경했습니다.",
   });
 }

@@ -163,7 +163,7 @@ export default function ProfilePage() {
         ok: true,
         text:
           data.message ??
-          "WorkBoard 비밀번호를 변경했습니다. 다음 로그인부터 새 비밀번호를 사용하세요.",
+          "로그인 비밀번호를 변경했습니다. 다음 로그인부터 새 비밀번호를 사용하세요.",
       });
     } catch (error) {
       setPasswordMessage({
@@ -192,9 +192,9 @@ export default function ProfilePage() {
         <p className="text-xs font-bold tracking-[0.18em] text-blue-600">
           MY PROFILE
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-950">내 정보 관리</h1>
+        <h1 className="mt-2 text-3xl font-bold text-slate-950">내 정보 변경</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          개인 연락처를 직접 관리하고 WorkBoard 로그인 비밀번호를 변경합니다.
+          로그인 비밀번호와 회사에서 필요한 개인 연락처를 직접 관리합니다.
         </p>
       </header>
 
@@ -223,7 +223,8 @@ export default function ProfilePage() {
         <div className="mb-5">
           <h2 className="text-xl font-bold text-slate-900">개인정보 변경</h2>
           <p className="mt-1 text-sm text-slate-500">
-            저장한 정보는 관리자 직원명부에 즉시 반영됩니다.
+            비상 상황과 우편물 발송에 필요한 정보이며 관리자 직원명부에 즉시
+            반영됩니다.
           </p>
         </div>
 
@@ -232,8 +233,9 @@ export default function ProfilePage() {
             <input
               type="email"
               autoComplete="email"
+              required
               value={draft.personalEmail}
-              placeholder="name@example.com"
+              placeholder="개인 이메일을 입력해 주세요."
               onChange={(event) =>
                 setDraft((current) => ({
                   ...current,
@@ -247,8 +249,9 @@ export default function ProfilePage() {
             <input
               type="tel"
               autoComplete="tel"
+              required
               value={draft.emergencyContactPhone}
-              placeholder="010-0000-0000"
+              placeholder="비상 시 연락 가능한 010-0000-0000"
               onChange={(event) =>
                 setDraft((current) => ({
                   ...current,
@@ -259,12 +262,13 @@ export default function ProfilePage() {
             />
           </ProfileField>
           <div className="sm:col-span-2">
-            <ProfileField label="현재 거주지 주소">
+            <ProfileField label="우편물 수령 가능 주소">
               <input
                 value={draft.homeAddress}
                 maxLength={300}
+                required
                 autoComplete="street-address"
-                placeholder="현재 거주 중인 주소를 입력해 주세요."
+                placeholder="우편물을 실제로 받을 수 있는 주소를 입력해 주세요."
                 onChange={(event) =>
                   setDraft((current) => ({
                     ...current,
@@ -293,12 +297,9 @@ export default function ProfilePage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-5">
-          <h2 className="text-xl font-bold text-slate-900">
-            WorkBoard 비밀번호 변경
-          </h2>
+          <h2 className="text-xl font-bold text-slate-900">로그인 비밀번호 변경</h2>
           <p className="mt-1 text-sm text-slate-500">
-            비밀번호는 HR에 저장되지 않으며 WorkBoard 인증 시스템에서 바로
-            변경됩니다.
+            변경한 비밀번호는 다음 WorkBoard 로그인부터 사용합니다.
           </p>
         </div>
 
@@ -338,8 +339,8 @@ export default function ProfilePage() {
             />
           </ProfileField>
           <p className="text-xs leading-5 text-slate-400 sm:col-span-2">
-            영문과 숫자를 포함해 8자 이상 입력해 주세요. 다음 WorkBoard
-            로그인부터 새 비밀번호를 사용합니다.
+            영문과 숫자를 포함해 8자 이상 입력해 주세요. 비밀번호는 화면이나
+            직원명부에 표시되지 않습니다.
           </p>
           {passwordMessage && (
             <Message ok={passwordMessage.ok}>{passwordMessage.text}</Message>
@@ -350,7 +351,7 @@ export default function ProfilePage() {
               disabled={changingPassword || !profile?.email}
               className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {changingPassword ? "변경 중..." : "WorkBoard 비밀번호 변경"}
+              {changingPassword ? "변경 중..." : "로그인 비밀번호 변경"}
             </button>
           </div>
         </form>
