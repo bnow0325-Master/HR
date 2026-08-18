@@ -32,7 +32,7 @@ export default function WorkboardUserStatus() {
 
     async function loadCurrentEmployee() {
       try {
-        const response = await fetch("/api/auth/workboard/me", {
+        const response = await fetch("/api/auth/company/me", {
           cache: "no-store",
         });
         if (cancelled) return;
@@ -89,7 +89,7 @@ export default function WorkboardUserStatus() {
   return (
     <Link href={workboardLoginUrl(pathname)} className="top-nav-user is-missing">
       <span className="top-nav-user-dot" />
-      워크보드 로그인
+      사내 통합 로그인
     </Link>
   );
 }

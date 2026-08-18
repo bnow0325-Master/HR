@@ -11,10 +11,10 @@ type WorkboardSessionPayload = {
   expiresAt: number;
 };
 
-type EmployeeCapability = "attendance" | "leave" | "workboard";
+type EmployeeCapability = "any" | "attendance" | "leave" | "workboard";
 
 function sessionSecret() {
-  return process.env.WORKBOARD_SSO_SECRET?.trim() ?? "";
+  return process.env.BNOW_IDENTITY_SESSION_SECRET?.trim() ?? "";
 }
 
 function sign(encodedPayload: string) {
@@ -41,7 +41,7 @@ export function createWorkboardSessionToken(
   email: string,
 ) {
   if (!workboardSessionConfigured()) {
-    throw new Error("WORKBOARD_SSO_SECRET is not configured.");
+    throw new Error("BNOW_IDENTITY_SESSION_SECRET is not configured.");
   }
 
   const payload: WorkboardSessionPayload = {
@@ -82,7 +82,7 @@ function parseWorkboardSessionToken(token: string) {
 }
 
 export async function getCurrentWorkboardEmployee(
-  capability: EmployeeCapability = "workboard",
+  capability: EmployeeCapability = "any",
 ) {
   const cookieStore = await cookies();
   const token = cookieStore.get(workboardSessionCookieName)?.value;
@@ -96,7 +96,7 @@ export async function getCurrentWorkboardEmployee(
       id: session.employeeId,
       email: { equals: session.email, mode: "insensitive" },
       active: true,
-      workboardEnabled: true,
+      ...(capability === "workboard" ? { workboardEnabled: true } : {}),
       ...(capability === "attendance" ? { attendanceEnabled: true } : {}),
       ...(capability === "leave" ? { leaveEnabled: true } : {}),
     },

@@ -16,7 +16,7 @@ export default function AdminNavLink() {
 
     async function checkAdminRole() {
       try {
-        const response = await fetch("/api/auth/workboard/me", {
+        const response = await fetch("/api/auth/company/me", {
           cache: "no-store",
         });
         if (!response.ok || cancelled) return;

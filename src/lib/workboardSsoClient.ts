@@ -1,5 +1,4 @@
-const WORKBOARD_SSO_URL =
-  "https://main.bnow.co.kr/hr-login.html";
+const COMPANY_LOGIN_URL = "/api/auth/company/login";
 
 const EMPLOYEE_PATHS = new Set([
   "/attendance",
@@ -16,7 +15,5 @@ export function isEmployeePath(pathname: string) {
 
 export function workboardLoginUrl(pathname: string) {
   const returnTo = isEmployeePath(pathname) ? pathname : "/attendance";
-  const url = new URL(WORKBOARD_SSO_URL);
-  url.searchParams.set("return_to", returnTo);
-  return url.toString();
+  return `${COMPANY_LOGIN_URL}?returnTo=${encodeURIComponent(returnTo)}`;
 }

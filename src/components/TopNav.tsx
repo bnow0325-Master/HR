@@ -23,7 +23,7 @@ const navItems = [
   },
 ];
 
-const hiddenPrefixes = ["/kiosk", "/auth/workboard"];
+const hiddenPrefixes = ["/kiosk", "/auth/company"];
 
 export default function TopNav() {
   const pathname = usePathname();

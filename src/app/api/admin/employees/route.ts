@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/adminAuth";
-import { syncWorkboardMember } from "@/lib/workboardMembers";
+import { syncCompanyIdentity } from "@/lib/companyIdentity";
 import {
   employeeSelect,
   parseDateOnly,
@@ -186,10 +186,10 @@ export async function POST(req: Request) {
     },
     select: employeeSelect,
   });
-  const workboardSync = await syncWorkboardMember(employee);
+  const identitySync = await syncCompanyIdentity(employee);
 
   return NextResponse.json(
-    { ok: true, employee, workboardSync },
+    { ok: true, employee, identitySync },
     { status: 201 },
   );
 }
