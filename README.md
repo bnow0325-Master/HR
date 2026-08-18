@@ -75,6 +75,9 @@ HR 직원용 화면을 직접 열었거나 세션이 만료된 경우 WorkBoard�
 - `WORKBOARD_SUPABASE_SERVICE_ROLE_KEY`: 로그인 계정 생성·비밀번호 재설정용 서버 JWT 키
 
 비밀키와 토큰은 Git에 커밋하지 않습니다.
+자체 서버 배포에서는 WorkBoard Auth 관리자 키를
+`/home/elonchoo/.config/bnow/.workboard-auth.env`에 권한 `600`으로 보관하며,
+파일이 없는 개발 환경에서는 해당 설정을 선택적으로 건너뜁니다.
 
 ## 검사와 배포
 
