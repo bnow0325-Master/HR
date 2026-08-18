@@ -68,7 +68,7 @@ export default function TopNav() {
           </button>
 
           <Link
-            href="https://bnow0325-master.github.io/workboard/"
+            href="https://main.bnow.co.kr/"
             className="top-nav-workboard"
           >
             BNOW WORKBOARD
