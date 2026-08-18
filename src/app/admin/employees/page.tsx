@@ -44,6 +44,12 @@ type EmployeeDraft = {
   workboardEnabled: boolean;
 };
 
+type WorkboardAccountDraft = {
+  name: string;
+  email: string;
+  password: string;
+};
+
 const DEVELOPMENT_EMPLOYEES_KEY = "checkinoutDevelopmentEmployees";
 const DEVELOPMENT_EMPLOYEE: Employee = {
   id: "development-chu-dong-hyeon",
@@ -83,6 +89,12 @@ const EMPTY_DRAFT: EmployeeDraft = {
   attendanceEnabled: true,
   leaveEnabled: true,
   workboardEnabled: true,
+};
+
+const EMPTY_WORKBOARD_ACCOUNT: WorkboardAccountDraft = {
+  name: "",
+  email: "",
+  password: "",
 };
 
 function normalizeEmployee(employee: Partial<Employee>): Employee {
@@ -246,6 +258,10 @@ export default function EmployeesAdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EmployeeDraft>(EMPTY_DRAFT);
   const [rosterText, setRosterText] = useState("");
+  const [accountDraft, setAccountDraft] = useState<WorkboardAccountDraft>(
+    EMPTY_WORKBOARD_ACCOUNT,
+  );
+  const [accountSaving, setAccountSaving] = useState(false);
   const [message, setMessage] = useState<{
     ok: boolean;
     text: string;
@@ -387,6 +403,45 @@ export default function EmployeesAdminPage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveWorkboardAccount(event: React.FormEvent) {
+    event.preventDefault();
+    setAccountSaving(true);
+    try {
+      const response = await fetch("/api/admin/workboard-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: accountDraft.name.trim(),
+          email: accountDraft.email.trim().toLowerCase(),
+          password: accountDraft.password,
+        }),
+      });
+      const data = await response.json();
+      if (response.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(data.error ?? "WorkBoard 계정 처리에 실패했습니다.");
+      }
+
+      const linkMessage = data.linkedToEmployee
+        ? " 직원명부의 이름과 권한을 적용했습니다."
+        : " 직원명부에는 별도로 등록해 주세요.";
+      flash(true, `${data.message}${linkMessage}`);
+      setAccountDraft(EMPTY_WORKBOARD_ACCOUNT);
+    } catch (error) {
+      flash(
+        false,
+        error instanceof Error
+          ? error.message
+          : "WorkBoard 계정 처리에 실패했습니다.",
+      );
+    } finally {
+      setAccountSaving(false);
     }
   }
 
@@ -547,6 +602,76 @@ export default function EmployeesAdminPage() {
         <SummaryCard label="관리자" value={`${adminCount}명`} />
         <SummaryCard label="WorkBoard 사용" value={`${workboardCount}명`} />
       </section>
+
+      <form
+        onSubmit={saveWorkboardAccount}
+        className="mb-6 rounded-2xl border border-blue-200 bg-blue-50/60 p-5 shadow-sm"
+      >
+        <div className="mb-4">
+          <h2 className="font-semibold text-slate-800">
+            WorkBoard 로그인 계정
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            신규 이메일은 계정을 만들고, 이미 등록된 이메일은 비밀번호를
+            재설정합니다. 비밀번호 원문은 HR 데이터베이스에 저장하지 않습니다.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="직원 이름">
+            <input
+              value={accountDraft.name}
+              placeholder="직원명부에 없을 때 필수"
+              onChange={(event) =>
+                setAccountDraft((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="WorkBoard 이메일 *">
+            <input
+              type="email"
+              required
+              value={accountDraft.email}
+              placeholder="name@bnow.co.kr"
+              onChange={(event) =>
+                setAccountDraft((current) => ({
+                  ...current,
+                  email: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+            />
+          </Field>
+          <Field label="초기·재설정 비밀번호 *">
+            <input
+              type="password"
+              required
+              minLength={8}
+              maxLength={128}
+              autoComplete="new-password"
+              value={accountDraft.password}
+              placeholder="영문+숫자 8자 이상"
+              onChange={(event) =>
+                setAccountDraft((current) => ({
+                  ...current,
+                  password: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+            />
+          </Field>
+        </div>
+        <button
+          type="submit"
+          disabled={accountSaving}
+          className="mt-4 rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+        >
+          {accountSaving ? "계정 처리 중..." : "계정 생성 · 비밀번호 재설정"}
+        </button>
+      </form>
 
       <form
         onSubmit={saveEmployee}
