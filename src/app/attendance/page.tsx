@@ -27,6 +27,12 @@ const attendanceMenus = [
     description: "이번 달 출퇴근 기록과 근무시간을 한눈에 조회합니다.",
   },
   {
+    href: "/profile",
+    eyebrow: "MY PROFILE",
+    title: "내 정보 관리",
+    description: "개인 연락처를 수정하고 WorkBoard 비밀번호를 변경합니다.",
+  },
+  {
     href: "/admin/employees",
     eyebrow: "DIRECTORY",
     title: "직원명부 관리",
