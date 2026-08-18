@@ -23,6 +23,10 @@ type ContractEmployeeRow = BasicEmployeeRow & {
   phone: string | null;
   hireDate: Date | string | null;
   terminationDate: Date | string | null;
+  systemRole: string;
+  attendanceEnabled: boolean;
+  leaveEnabled: boolean;
+  workboardEnabled: boolean;
 };
 
 const CONTRACT_DIRECTORY_COLUMNS = [
@@ -31,6 +35,10 @@ const CONTRACT_DIRECTORY_COLUMNS = [
   "phone",
   "hireDate",
   "terminationDate",
+  "systemRole",
+  "attendanceEnabled",
+  "leaveEnabled",
+  "workboardEnabled",
 ] as const;
 
 function responseHeaders() {
@@ -75,6 +83,10 @@ async function listContractEmployees(
             "phone",
             "hireDate",
             "terminationDate",
+            "systemRole",
+            "attendanceEnabled",
+            "leaveEnabled",
+            "workboardEnabled",
             "active"
           FROM "Employee"
           ORDER BY "code" ASC
@@ -91,6 +103,10 @@ async function listContractEmployees(
             "phone",
             "hireDate",
             "terminationDate",
+            "systemRole",
+            "attendanceEnabled",
+            "leaveEnabled",
+            "workboardEnabled",
             "active"
           FROM "Employee"
           WHERE "active" = true
@@ -112,6 +128,10 @@ async function listContractEmployees(
     phone: null,
     hireDate: null,
     terminationDate: null,
+    systemRole: "MEMBER",
+    attendanceEnabled: false,
+    leaveEnabled: false,
+    workboardEnabled: false,
   }));
 }
 

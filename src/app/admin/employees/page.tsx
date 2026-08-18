@@ -45,7 +45,6 @@ type EmployeeDraft = {
 };
 
 type WorkboardAccountDraft = {
-  name: string;
   email: string;
   password: string;
 };
@@ -92,7 +91,6 @@ const EMPTY_DRAFT: EmployeeDraft = {
 };
 
 const EMPTY_WORKBOARD_ACCOUNT: WorkboardAccountDraft = {
-  name: "",
   email: "",
   password: "",
 };
@@ -262,6 +260,7 @@ export default function EmployeesAdminPage() {
     EMPTY_WORKBOARD_ACCOUNT,
   );
   const [accountSaving, setAccountSaving] = useState(false);
+  const [identitySyncing, setIdentitySyncing] = useState(false);
   const [message, setMessage] = useState<{
     ok: boolean;
     text: string;
@@ -364,7 +363,7 @@ export default function EmployeesAdminPage() {
       nextEmployees.sort((a, b) => a.code.localeCompare(b.code));
       saveDevelopmentEmployees(nextEmployees);
       setEmployees(nextEmployees);
-      return { workboardSync: null };
+      return { identitySync: null };
     }
 
     const response = await fetch(
@@ -390,8 +389,8 @@ export default function EmployeesAdminPage() {
     try {
       const data = await persistDraft(draft, editingId ?? undefined);
       const action = editingId ? "변경" : "등록";
-      const syncMessage = data.workboardSync?.message
-        ? ` ${data.workboardSync.message}`
+      const syncMessage = data.identitySync?.message
+        ? ` ${data.identitySync.message}`
         : "";
       flash(true, `${draft.name} 직원정보를 ${action}했습니다.${syncMessage}`);
       resetForm();
@@ -406,15 +405,14 @@ export default function EmployeesAdminPage() {
     }
   }
 
-  async function saveWorkboardAccount(event: React.FormEvent) {
+  async function saveCompanyAccountPassword(event: React.FormEvent) {
     event.preventDefault();
     setAccountSaving(true);
     try {
-      const response = await fetch("/api/admin/workboard-accounts", {
+      const response = await fetch("/api/admin/identity/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: accountDraft.name.trim(),
           email: accountDraft.email.trim().toLowerCase(),
           password: accountDraft.password,
         }),
@@ -425,23 +423,66 @@ export default function EmployeesAdminPage() {
         return;
       }
       if (!response.ok) {
-        throw new Error(data.error ?? "WorkBoard 계정 처리에 실패했습니다.");
+        throw new Error(data.error ?? "사내 통합 계정 처리에 실패했습니다.");
       }
 
-      const linkMessage = data.linkedToEmployee
-        ? " 직원명부의 이름과 권한을 적용했습니다."
-        : " 직원명부에는 별도로 등록해 주세요.";
-      flash(true, `${data.message}${linkMessage}`);
+      flash(true, data.message);
       setAccountDraft(EMPTY_WORKBOARD_ACCOUNT);
     } catch (error) {
       flash(
         false,
         error instanceof Error
           ? error.message
-          : "WorkBoard 계정 처리에 실패했습니다.",
+          : "사내 통합 계정 처리에 실패했습니다.",
       );
     } finally {
       setAccountSaving(false);
+    }
+  }
+
+  async function reconcileCompanyIdentity() {
+    if (isDevelopment) {
+      flash(
+        false,
+        "전체 사내 인증 동기화는 운영 DB와 Keycloak이 연결된 환경에서 실행합니다.",
+      );
+      return;
+    }
+
+    setIdentitySyncing(true);
+    try {
+      const response = await fetch("/api/admin/identity/reconcile", {
+        method: "POST",
+      });
+      const data = await response.json();
+      if (response.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(data.error ?? "사내 인증 동기화에 실패했습니다.");
+      }
+
+      const summary = data.summary as {
+        total: number;
+        synced: number;
+        disabled: number;
+        skipped: number;
+        failed: number;
+      };
+      flash(
+        summary.failed === 0,
+        `사내 인증 ${summary.total}명 확인: 활성 ${summary.synced}명, 비활성 ${summary.disabled}명, 건너뜀 ${summary.skipped}명, 실패 ${summary.failed}명`,
+      );
+    } catch (error) {
+      flash(
+        false,
+        error instanceof Error
+          ? error.message
+          : "사내 인증 동기화에 실패했습니다.",
+      );
+    } finally {
+      setIdentitySyncing(false);
     }
   }
 
@@ -603,34 +644,38 @@ export default function EmployeesAdminPage() {
         <SummaryCard label="WorkBoard 사용" value={`${workboardCount}명`} />
       </section>
 
+      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+        <div>
+          <h2 className="font-semibold text-emerald-950">사내 통합 로그인</h2>
+          <p className="mt-1 text-xs leading-5 text-emerald-800">
+            직원명부의 재직 상태와 서비스 권한을 사내 인증 서버에 일괄 반영합니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={identitySyncing}
+          onClick={() => void reconcileCompanyIdentity()}
+          className="rounded-lg bg-emerald-800 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {identitySyncing ? "동기화 중..." : "전체 직원 인증 동기화"}
+        </button>
+      </section>
+
       <form
-        onSubmit={saveWorkboardAccount}
+        onSubmit={saveCompanyAccountPassword}
         className="mb-6 rounded-2xl border border-blue-200 bg-blue-50/60 p-5 shadow-sm"
       >
         <div className="mb-4">
           <h2 className="font-semibold text-slate-800">
-            WorkBoard 로그인 계정
+            사내 통합 로그인 계정
           </h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            신규 이메일은 계정을 만들고, 이미 등록된 이메일은 비밀번호를
-            재설정합니다. 비밀번호 원문은 HR 데이터베이스에 저장하지 않습니다.
+            직원명부에 등록된 재직자의 임시 비밀번호를 설정합니다. 비밀번호 원문은
+            HR 데이터베이스에 저장하지 않으며, 직원은 다음 로그인에서 변경해야 합니다.
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="직원 이름">
-            <input
-              value={accountDraft.name}
-              placeholder="직원명부에 없을 때 필수"
-              onChange={(event) =>
-                setAccountDraft((current) => ({
-                  ...current,
-                  name: event.target.value,
-                }))
-              }
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-            />
-          </Field>
-          <Field label="WorkBoard 이메일 *">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="회사 이메일 *">
             <input
               type="email"
               required
@@ -669,7 +714,7 @@ export default function EmployeesAdminPage() {
           disabled={accountSaving}
           className="mt-4 rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
         >
-          {accountSaving ? "계정 처리 중..." : "계정 생성 · 비밀번호 재설정"}
+          {accountSaving ? "설정 중..." : "임시 비밀번호 설정"}
         </button>
       </form>
 

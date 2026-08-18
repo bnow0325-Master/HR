@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { sessionCookieName } from "@/lib/adminAuth";
+import { workboardSessionCookieName } from "@/lib/workboardSession";
 
 export async function POST() {
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(sessionCookieName, "", {
+  res.cookies.set(workboardSessionCookieName, "", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

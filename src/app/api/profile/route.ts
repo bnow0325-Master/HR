@@ -24,7 +24,7 @@ type ProfileBody = {
 };
 
 async function currentEmployee() {
-  return getCurrentWorkboardEmployee("workboard");
+  return getCurrentWorkboardEmployee("any");
 }
 
 export async function GET() {

@@ -37,14 +37,6 @@ export default function ProfilePage() {
     ok: boolean;
     text: string;
   } | null>(null);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [passwordMessage, setPasswordMessage] = useState<{
-    ok: boolean;
-    text: string;
-  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,55 +121,6 @@ export default function ProfilePage() {
     }
   }
 
-  async function changePassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPasswordMessage(null);
-
-    if (newPassword !== confirmPassword) {
-      setPasswordMessage({
-        ok: false,
-        text: "새 비밀번호와 확인 비밀번호가 일치하지 않습니다.",
-      });
-      return;
-    }
-
-    setChangingPassword(true);
-    try {
-      const response = await fetch("/api/profile/password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-      const data = (await response.json()) as {
-        message?: string;
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(data.error ?? "비밀번호 변경에 실패했습니다.");
-      }
-
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setPasswordMessage({
-        ok: true,
-        text:
-          data.message ??
-          "로그인 비밀번호를 변경했습니다. 다음 로그인부터 새 비밀번호를 사용하세요.",
-      });
-    } catch (error) {
-      setPasswordMessage({
-        ok: false,
-        text:
-          error instanceof Error
-            ? error.message
-            : "비밀번호 변경에 실패했습니다.",
-      });
-    } finally {
-      setChangingPassword(false);
-    }
-  }
-
   if (loading) {
     return (
       <main className="mx-auto max-w-4xl px-6 py-16 text-center text-sm text-slate-500">
@@ -194,7 +137,7 @@ export default function ProfilePage() {
         </p>
         <h1 className="mt-2 text-3xl font-bold text-slate-950">내 정보 변경</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          로그인 비밀번호와 회사에서 필요한 개인 연락처를 직접 관리합니다.
+          개인 연락처를 직접 관리하고 사내 통합 계정 보안을 확인합니다.
         </p>
       </header>
 
@@ -297,64 +240,19 @@ export default function ProfilePage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-5">
-          <h2 className="text-xl font-bold text-slate-900">로그인 비밀번호 변경</h2>
+          <h2 className="text-xl font-bold text-slate-900">사내 통합 계정</h2>
           <p className="mt-1 text-sm text-slate-500">
-            변경한 비밀번호는 다음 WorkBoard 로그인부터 사용합니다.
+            비밀번호와 다중 인증은 자체 인증 서버에서 관리하며 HR에는 저장되지 않습니다.
           </p>
         </div>
-
-        <form onSubmit={changePassword} className="grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <ProfileField label="현재 비밀번호">
-              <input
-                type="password"
-                autoComplete="current-password"
-                required
-                value={currentPassword}
-                onChange={(event) => setCurrentPassword(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-              />
-            </ProfileField>
-          </div>
-          <ProfileField label="새 비밀번호">
-            <input
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            />
-          </ProfileField>
-          <ProfileField label="새 비밀번호 확인">
-            <input
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            />
-          </ProfileField>
-          <p className="text-xs leading-5 text-slate-400 sm:col-span-2">
-            영문과 숫자를 포함해 8자 이상 입력해 주세요. 비밀번호는 화면이나
-            직원명부에 표시되지 않습니다.
-          </p>
-          {passwordMessage && (
-            <Message ok={passwordMessage.ok}>{passwordMessage.text}</Message>
-          )}
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              disabled={changingPassword || !profile?.email}
-              className="rounded-xl bg-slate-950 px-6 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {changingPassword ? "변경 중..." : "로그인 비밀번호 변경"}
-            </button>
-          </div>
-        </form>
+        <a
+          href="https://auth.bnow.co.kr/realms/bnow/account/#/security/signingin"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="inline-flex rounded-xl bg-slate-950 px-6 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+        >
+          비밀번호·보안 설정 열기
+        </a>
       </section>
     </main>
   );

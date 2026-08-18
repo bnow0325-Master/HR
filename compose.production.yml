@@ -7,8 +7,6 @@ services:
       target: migrate
     env_file:
       - path: .env.production.local
-      - path: /home/elonchoo/.config/bnow/.workboard-auth.env
-        required: false
     restart: "no"
 
   app:
@@ -17,8 +15,6 @@ services:
       target: runner
     env_file:
       - path: .env.production.local
-      - path: /home/elonchoo/.config/bnow/.workboard-auth.env
-        required: false
     depends_on:
       migrate:
         condition: service_completed_successfully

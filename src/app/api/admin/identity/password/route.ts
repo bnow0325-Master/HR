@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/adminAuth";
 import { validEmail } from "@/lib/employeeData";
-import { provisionWorkboardAccount } from "@/lib/workboardMembers";
+import {
+  setCompanyIdentityTemporaryPassword,
+  syncCompanyIdentity,
+} from "@/lib/companyIdentity";
+import { prisma } from "@/lib/prisma";
 
-type AccountBody = {
+type PasswordBody = {
   email?: unknown;
-  name?: unknown;
   password?: unknown;
 };
 
@@ -19,7 +21,7 @@ function validPassword(password: string) {
   );
 }
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   if (!(await isAdmin())) {
     return NextResponse.json(
       { error: "관리자 인증이 필요합니다." },
@@ -27,19 +29,16 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: AccountBody;
+  let body: PasswordBody;
   try {
-    body = (await req.json()) as AccountBody;
+    body = (await request.json()) as PasswordBody;
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const email = typeof body.email === "string"
-    ? body.email.trim().toLowerCase()
-    : "";
-  const requestedName = typeof body.name === "string" ? body.name.trim() : "";
+  const email =
+    typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
-
   if (!email || !validEmail(email)) {
     return NextResponse.json(
       { error: "회사 이메일을 올바르게 입력해 주세요." },
@@ -56,41 +55,40 @@ export async function POST(req: Request) {
   const employee = await prisma.employee.findFirst({
     where: { email: { equals: email, mode: "insensitive" } },
     select: {
+      id: true,
+      code: true,
       name: true,
+      department: true,
+      position: true,
+      email: true,
       systemRole: true,
       active: true,
+      attendanceEnabled: true,
+      leaveEnabled: true,
       workboardEnabled: true,
     },
   });
-  if (employee && (!employee.active || !employee.workboardEnabled)) {
+  if (!employee) {
     return NextResponse.json(
-      { error: "비활성화된 직원은 WorkBoard 계정을 사용할 수 없습니다." },
+      { error: "직원명부에 등록된 회사 이메일만 사용할 수 있습니다." },
+      { status: 404 },
+    );
+  }
+  if (!employee.active) {
+    return NextResponse.json(
+      { error: "퇴사 또는 비활성 직원의 계정은 재설정할 수 없습니다." },
       { status: 409 },
     );
   }
 
-  const name = employee?.name ?? requestedName;
-  if (!name) {
-    return NextResponse.json(
-      { error: "직원명부에 없는 계정은 이름을 함께 입력해 주세요." },
-      { status: 400 },
-    );
+  const sync = await syncCompanyIdentity(employee);
+  if (!sync.ok) {
+    return NextResponse.json({ error: sync.message }, { status: 502 });
   }
-
-  const result = await provisionWorkboardAccount({
-    email,
-    password,
-    name,
-    systemRole: employee?.systemRole === "ADMIN" ? "ADMIN" : "MEMBER",
-  });
+  const result = await setCompanyIdentityTemporaryPassword(email, password);
   if (!result.ok) {
     return NextResponse.json({ error: result.message }, { status: 502 });
   }
 
-  return NextResponse.json({
-    ok: true,
-    state: result.state,
-    message: result.message,
-    linkedToEmployee: Boolean(employee),
-  });
+  return NextResponse.json({ ok: true, message: result.message });
 }

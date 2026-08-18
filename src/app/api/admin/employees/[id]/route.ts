@@ -8,7 +8,7 @@ import {
   validEmail,
   validPhone,
 } from "@/lib/employeeData";
-import { syncWorkboardMember } from "@/lib/workboardMembers";
+import { syncCompanyIdentity } from "@/lib/companyIdentity";
 
 type UpdateEmployeeBody = {
   code?: string;
@@ -276,12 +276,13 @@ export async function PATCH(
     data,
     select: employeeSelect,
   });
-  const workboardSync = await syncWorkboardMember(
-    employee,
-    existing.email,
-  );
+  const identitySync = await syncCompanyIdentity(employee, existing.email);
 
-  return NextResponse.json({ ok: true, employee, workboardSync });
+  return NextResponse.json({
+    ok: true,
+    employee,
+    identitySync,
+  });
 }
 
 export async function DELETE(
@@ -315,10 +316,11 @@ export async function DELETE(
     },
     select: employeeSelect,
   });
-  const workboardSync = await syncWorkboardMember(
-    employee,
-    existing.email,
-  );
+  const identitySync = await syncCompanyIdentity(employee, existing.email);
 
-  return NextResponse.json({ ok: true, employee, workboardSync });
+  return NextResponse.json({
+    ok: true,
+    employee,
+    identitySync,
+  });
 }
