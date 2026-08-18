@@ -84,7 +84,13 @@ export async function PATCH(request: Request) {
 
   if (!validEmail(personalEmail)) {
     return NextResponse.json(
-      { error: "개인 이메일 형식이 올바르지 않습니다." },
+      { error: "개인 이메일을 올바른 형식으로 입력해 주세요." },
+      { status: 400 },
+    );
+  }
+  if (!personalEmail) {
+    return NextResponse.json(
+      { error: "개인 이메일을 입력해 주세요." },
       { status: 400 },
     );
   }
@@ -97,9 +103,21 @@ export async function PATCH(request: Request) {
       { status: 400 },
     );
   }
+  if (!emergencyContactPhone) {
+    return NextResponse.json(
+      { error: "비상연락망 연락처를 입력해 주세요." },
+      { status: 400 },
+    );
+  }
+  if (!homeAddress) {
+    return NextResponse.json(
+      { error: "우편물 수령 가능 주소를 입력해 주세요." },
+      { status: 400 },
+    );
+  }
   if (homeAddress && homeAddress.length > 300) {
     return NextResponse.json(
-      { error: "현재 거주지 주소는 300자 이내로 입력해 주세요." },
+      { error: "우편물 수령 가능 주소는 300자 이내로 입력해 주세요." },
       { status: 400 },
     );
   }
