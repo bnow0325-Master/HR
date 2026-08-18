@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const WORKBOARD_URL = "https://bnow0325-master.github.io/workboard/";
+const WORKBOARD_URL = "https://main.bnow.co.kr/";
 const ALLOWED_DESTINATIONS = new Set([
   "/attendance",
   "/check",

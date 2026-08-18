@@ -1,5 +1,5 @@
 const WORKBOARD_SSO_URL =
-  "https://bnow0325-master.github.io/workboard/hr-login.html";
+  "https://main.bnow.co.kr/hr-login.html";
 
 const EMPLOYEE_PATHS = new Set([
   "/attendance",
