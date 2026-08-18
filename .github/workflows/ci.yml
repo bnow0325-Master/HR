@@ -55,6 +55,9 @@ jobs:
       - name: Apply migrations
         run: npx prisma migrate deploy
 
+      - name: Test company identity integration
+        run: npm run test:identity
+
       - name: Type-check
         run: npm run typecheck
 

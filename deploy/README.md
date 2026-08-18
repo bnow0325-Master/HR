@@ -9,6 +9,7 @@ BNOW HR은 Ubuntu 운영 서버에서 Docker Compose로 실행하고, 호스트 
 - DB: 기존 Neon PostgreSQL 유지
 - 외부 공개: Nginx 80/443만 사용
 - 내부 앱 포트: `127.0.0.1:3010`
+- 인증: 자체 Keycloak의 `hr-server` confidential OIDC client
 - 환경변수: 서버의 `/opt/bnow/checkinout/.env.production.local`에만 저장
 
 ## 배포
@@ -35,4 +36,4 @@ Compose는 앱 시작 전에 Prisma 운영 마이그레이션을 적용한다. �
 
 새 컨테이너에 문제가 있으면 직전 정상 Docker 이미지로 앱을 되돌린다. Nginx와
 TLS 설정은 유지하고 `/attendance`, `/check`, `/leave`, `/business-trips`,
-`/admin/login`, `/api/employees`를 다시 검증한다.
+`/api/auth/company/login`, `/admin`, `/api/employees`를 다시 검증한다.

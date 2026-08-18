@@ -18,8 +18,8 @@ BNOW 임직원의 출퇴근, 근무기록, 휴가, 출장, 직원명부를 통�
 - 관리자 기간별 근무 집계와 CSV 내보내기
 - 휴가 신청, 연차 현황, 신청 내역 관리
 - 출장 기간·사유·출장일지 관리
-- 직원명부, 입·퇴사 상태, 인사관리 및 WorkBoard 권한 관리
-- WorkBoard 로그인 사용자를 검증해 전 메뉴에서 동일한 직원으로 자동 연결
+- 직원명부, 입·퇴사 상태, 인사관리 및 사내 서비스 권한 관리
+- 자체 사내 계정으로 로그인해 전 메뉴에서 동일한 직원으로 자동 연결
 
 ## 화면 구성
 
@@ -32,9 +32,9 @@ BNOW 임직원의 출퇴근, 근무기록, 휴가, 출장, 직원명부를 통�
 | `/business-trips` | 출장 신청과 출장일지 |
 | `/admin` | 관리자 근무 집계 |
 | `/admin/employees` | 직원명부와 권한 관리 |
-| `/admin/login` | 관리자 로그인 |
+| `/admin/login` | 사내 통합 로그인 및 관리자 권한 확인 |
 | `/kiosk` | 선택형 QR 키오스크 화면 |
-| `/auth/workboard` | WorkBoard 로그인 검증 및 HR 세션 연결 |
+| `/auth/company` | 사내 통합 로그인 오류 및 재로그인 안내 |
 
 ## 기술 스택
 
@@ -56,28 +56,28 @@ npm run dev
 운영·로컬 환경변수는 Git에서 제외된 `.env` 또는 `.env.production.local`에만
 저장합니다.
 
-## WorkBoard 로그인 연동
+## 사내 통합 인증
 
-WorkBoard의 `인사관리` 버튼은 현재 Supabase 로그인 토큰을 URL fragment로 HR에
-전달합니다. HR 서버는 Supabase에서 토큰을 검증한 뒤 이메일이 일치하고
-`active`, `workboardEnabled`가 활성화된 직원에게만 서명된 HttpOnly 세션을
-발급합니다. 출퇴근, 기록부, 휴가, 출장 API는 클라이언트가 보낸 직원 ID가 아닌
-이 서버 세션의 직원만 사용합니다.
+`D:\PROJECT\bnow-identity`의 자체 Keycloak이 로그인과 비밀번호를 담당하고, HR
+직원명부가 재직 상태와 애플리케이션 권한의 기준 원장입니다. HR과 WorkBoard는
+각각 confidential OIDC BFF client를 사용하므로 브라우저에는 Keycloak client
+secret이나 access token을 저장하지 않습니다.
 
-HR 직원용 화면을 직접 열었거나 세션이 만료된 경우 WorkBoard의
-`hr-login.html`로 이동해 기존 로그인 세션을 다시 확인한 뒤 원래 HR 메뉴로
-자동 복귀합니다. 모든 HR 화면 상단에는 현재 로그인 직원명과 부서를 표시합니다.
+직원 저장·수정·퇴사 처리 시 HR이 사내 계정과 역할을 즉시 동기화합니다. 퇴사자는
+기록 보존을 위해 삭제하지 않고 계정과 모든 관리 역할을 비활성화합니다. 관리자
+페이지도 별도 공용 비밀번호 없이 로그인한 직원의 `systemRole=ADMIN`과
+`company_admin/hr_admin` 권한으로 접근합니다.
 
-- `WORKBOARD_SUPABASE_URL`: WorkBoard Supabase 프로젝트 URL
-- `WORKBOARD_SUPABASE_ANON_KEY`: Supabase 공개 키
-- `WORKBOARD_SSO_SECRET`: HR 세션 서명용 32바이트 이상 비밀키
-- `WORKBOARD_SUPABASE_SECRET_KEY`: 직원명부 권한 동기화용 서버 비밀키
-- `WORKBOARD_SUPABASE_SERVICE_ROLE_KEY`: 로그인 계정 생성·비밀번호 재설정용 서버 JWT 키
+- `BNOW_IDENTITY_URL`, `BNOW_IDENTITY_REALM`: 자체 Keycloak 위치와 realm
+- `BNOW_IDENTITY_ADMIN_CLIENT_*`: 직원 계정·권한 동기화용 service account
+- `BNOW_IDENTITY_LOGIN_CLIENT_*`: HR 로그인용 `hr-server` confidential client
+- `BNOW_IDENTITY_LOGIN_REDIRECT_URI`: HR OIDC callback의 정확한 HTTPS 주소
+- `BNOW_IDENTITY_SESSION_SECRET`: HR HttpOnly 세션과 로그인 흐름 서명 키
 
-비밀키와 토큰은 Git에 커밋하지 않습니다.
-자체 서버 배포에서는 WorkBoard Auth 관리자 키를
-`/home/elonchoo/.config/bnow/.workboard-auth.env`에 권한 `600`으로 보관하며,
-파일이 없는 개발 환경에서는 해당 설정을 선택적으로 건너뜁니다.
+직원관리의 `전체 직원 인증 동기화`는 기존 직원을 5명씩 처리하며 재직자는 역할을
+갱신하고 퇴사자는 계정을 비활성화합니다. `임시 비밀번호 설정`은 Keycloak에만
+일회성 비밀번호를 기록하며, 사용자는 다음 로그인에서 새 비밀번호로 변경해야 합니다.
+이 코드 경로에는 Supabase URL·키·Auth API가 필요하지 않습니다.
 
 ## 검사와 배포
 
@@ -100,7 +100,9 @@ PR을 `main`에 병합한 뒤 [deploy/README.md](./deploy/README.md)의 자체 �
 전자계약 등 내부 시스템은 Bearer 인증이 적용된
 `GET /api/internal/employee-directory`를 통해 HR 명부를 조회합니다. 기본 응답은
 재직자만 포함하며, 관리자용 전체 동기화는 `includeInactive=1`을 사용해 퇴사일과
-재직 상태까지 전달합니다. 연동 토큰은 서버 환경변수에만 저장합니다.
+재직 상태까지 전달합니다. `systemRole`, `attendanceEnabled`, `leaveEnabled`,
+`workboardEnabled`도 함께 전달해 각 사내 서비스가 HR 권한을 최종 기준으로
+사용합니다. 연동 토큰은 서버 환경변수에만 저장합니다.
 
 개발 규칙은 [AGENTS.md](./AGENTS.md), 배포 요약은 [DEPLOY.md](./DEPLOY.md)를
 참고합니다.
