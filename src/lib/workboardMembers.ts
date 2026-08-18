@@ -27,6 +27,12 @@ function configuration() {
   return { url, key };
 }
 
+function authAdminConfiguration() {
+  const url = process.env.WORKBOARD_SUPABASE_URL?.replace(/\/$/, "") ?? "";
+  const key = process.env.WORKBOARD_SUPABASE_SERVICE_ROLE_KEY ?? "";
+  return { url, key };
+}
+
 function headers(key: string) {
   const requestHeaders: Record<string, string> = {
     apikey: key,
@@ -166,7 +172,8 @@ export async function provisionWorkboardAccount(input: {
   name: string;
   systemRole: "ADMIN" | "MEMBER";
 }): Promise<WorkboardAccountResult> {
-  const { url, key } = configuration();
+  // Supabase Auth admin write routes currently require the legacy JWT key.
+  const { url, key } = authAdminConfiguration();
   if (!url || !key) {
     return {
       ok: false,
