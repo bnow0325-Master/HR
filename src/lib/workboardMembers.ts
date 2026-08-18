@@ -20,16 +20,25 @@ export type WorkboardAccountResult = {
 
 function configuration() {
   const url = process.env.WORKBOARD_SUPABASE_URL?.replace(/\/$/, "") ?? "";
-  const key = process.env.WORKBOARD_SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const key =
+    process.env.WORKBOARD_SUPABASE_SECRET_KEY ??
+    process.env.WORKBOARD_SUPABASE_SERVICE_ROLE_KEY ??
+    "";
   return { url, key };
 }
 
 function headers(key: string) {
-  return {
+  const requestHeaders: Record<string, string> = {
     apikey: key,
-    Authorization: `Bearer ${key}`,
     "Content-Type": "application/json",
   };
+
+  // Supabase secret keys are not JWTs and fail if used as Bearer tokens.
+  if (!key.startsWith("sb_secret_")) {
+    requestHeaders.Authorization = `Bearer ${key}`;
+  }
+
+  return requestHeaders;
 }
 
 async function setMemberInactive(email: string) {
