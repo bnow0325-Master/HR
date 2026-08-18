@@ -71,7 +71,7 @@ HR 직원용 화면을 직접 열었거나 세션이 만료된 경우 WorkBoard�
 - `WORKBOARD_SUPABASE_URL`: WorkBoard Supabase 프로젝트 URL
 - `WORKBOARD_SUPABASE_ANON_KEY`: Supabase 공개 키
 - `WORKBOARD_SSO_SECRET`: HR 세션 서명용 32바이트 이상 비밀키
-- `WORKBOARD_SUPABASE_SERVICE_ROLE_KEY`: 직원명부 권한 동기화용 서버 키
+- `WORKBOARD_SUPABASE_SECRET_KEY`: 직원명부 권한 및 로그인 계정 동기화용 서버 비밀키
 
 비밀키와 토큰은 Git에 커밋하지 않습니다.
 
