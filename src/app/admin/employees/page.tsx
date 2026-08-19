@@ -648,14 +648,15 @@ export default function EmployeesAdminPage() {
         <div>
           <h2 className="font-semibold text-emerald-950">사내 통합 로그인</h2>
           <p className="mt-1 text-xs leading-5 text-emerald-800">
-            직원명부의 재직 상태와 서비스 권한을 사내 인증 서버에 일괄 반영합니다.
+            직원정보 저장 시 자동 반영됩니다. 이 버튼은 전체 계정과 권한을 다시
+            맞출 때 사용합니다.
           </p>
         </div>
         <button
           type="button"
           disabled={identitySyncing}
           onClick={() => void reconcileCompanyIdentity()}
-          className="rounded-lg bg-emerald-800 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="rounded-lg border border-slate-400 bg-slate-200 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-300 disabled:cursor-wait disabled:bg-slate-200 disabled:text-slate-950 disabled:opacity-100"
         >
           {identitySyncing ? "동기화 중..." : "전체 직원 인증 동기화"}
         </button>
