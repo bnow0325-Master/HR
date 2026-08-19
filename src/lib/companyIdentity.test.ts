@@ -75,18 +75,18 @@ test("inactive employee receives no managed roles", () => {
   );
 });
 
-test("employee names always produce a complete Keycloak profile", () => {
+test("employee names are preserved as one display value", () => {
   assert.deepEqual(identityProfileName("추동현"), {
-    firstName: "동현",
-    lastName: "추",
+    firstName: "추동현",
+    lastName: "",
   });
   assert.deepEqual(identityProfileName("Test Employee"), {
-    firstName: "Test",
-    lastName: "Employee",
+    firstName: "Test Employee",
+    lastName: "",
   });
   assert.deepEqual(identityProfileName("WEIHUANG"), {
     firstName: "WEIHUANG",
-    lastName: "-",
+    lastName: "",
   });
 });
 
@@ -142,8 +142,8 @@ test("new active employee is created and assigned managed roles", async () => {
     assert.deepEqual(create?.body, {
       username: "employee@example.test",
       email: "employee@example.test",
-      firstName: "Test",
-      lastName: "Employee",
+      firstName: "Test Employee",
+      lastName: "",
       enabled: true,
       emailVerified: true,
       attributes: {
@@ -221,8 +221,8 @@ test("existing employee profile is completed without clearing password actions",
     assert.deepEqual(update?.body, {
       username: "employee@example.test",
       email: "employee@example.test",
-      firstName: "Test",
-      lastName: "Employee",
+      firstName: "Test Employee",
+      lastName: "",
       enabled: true,
       emailVerified: true,
       attributes: {
