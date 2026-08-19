@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { decodeCompanyOidcFlow, exchangeCompanyCode } from "@/lib/companyOidc";
+import { companyApplicationUrl, decodeCompanyOidcFlow, exchangeCompanyCode } from "@/lib/companyOidc";
 import { createWorkboardSessionToken, workboardSessionCookieName, workboardSessionMaxAge } from "@/lib/workboardSession";
 
 function clearOauthCookie(response: NextResponse) {
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       select: { id: true, email: true },
     });
     if (!employee?.email) throw new Error("Active HR employee was not found.");
-    const destination = new URL(flow.returnTo, request.nextUrl.origin);
+    const destination = companyApplicationUrl(flow.returnTo);
     const response = NextResponse.redirect(destination);
     response.cookies.set({
       name: workboardSessionCookieName,
@@ -33,6 +33,6 @@ export async function GET(request: NextRequest) {
     });
     return clearOauthCookie(response);
   } catch {
-    return clearOauthCookie(NextResponse.redirect(new URL("/auth/company?error=access_denied", request.nextUrl.origin)));
+    return clearOauthCookie(NextResponse.redirect(companyApplicationUrl("/auth/company?error=access_denied")));
   }
 }

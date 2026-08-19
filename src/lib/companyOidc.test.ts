@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  companyApplicationUrl,
   decodeCompanyOidcFlow,
   encodeCompanyOidcFlow,
   safeCompanyReturnTo,
@@ -10,6 +11,14 @@ test("company OIDC return path is restricted to HR pages", () => {
   assert.equal(safeCompanyReturnTo("/leave"), "/leave");
   assert.equal(safeCompanyReturnTo("//evil.example"), "/attendance");
   assert.equal(safeCompanyReturnTo("https://evil.example"), "/attendance");
+});
+
+test("company OIDC application URL uses the configured public callback origin", () => {
+  configureOidc();
+  assert.equal(
+    companyApplicationUrl("/auth/company?error=access_denied").toString(),
+    "https://hr.example.test/auth/company?error=access_denied",
+  );
 });
 
 function configureOidc() {

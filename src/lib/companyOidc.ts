@@ -51,6 +51,12 @@ export function companyOidcConfigured() {
   try { return Boolean(configuration()); } catch { return false; }
 }
 
+export function companyApplicationUrl(path: string) {
+  const config = configuration();
+  if (!config) throw new Error("Company OIDC is not configured.");
+  return new URL(path, new URL(config.redirectUri).origin);
+}
+
 export function safeCompanyReturnTo(value: unknown) {
   if (typeof value !== "string") return "/attendance";
   const path = value.split("?", 1)[0] || "";
