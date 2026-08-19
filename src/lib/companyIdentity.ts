@@ -96,22 +96,7 @@ export function desiredIdentityRoles(
 
 export function identityProfileName(fullName: string) {
   const normalized = fullName.trim().replace(/\s+/g, " ");
-  if (/^[가-힣]{2,4}$/.test(normalized)) {
-    return {
-      firstName: normalized.slice(1),
-      lastName: normalized.slice(0, 1),
-    };
-  }
-
-  const parts = normalized.split(" ").filter(Boolean);
-  if (parts.length > 1) {
-    return {
-      firstName: parts.slice(0, -1).join(" "),
-      lastName: parts.at(-1) ?? "-",
-    };
-  }
-
-  return { firstName: normalized || "-", lastName: "-" };
+  return { firstName: normalized || "-", lastName: "" };
 }
 
 function realmAdminUrl(config: IdentityConfiguration, path: string) {
