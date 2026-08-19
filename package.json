@@ -13,6 +13,7 @@
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
     "test:identity": "tsx --test src/lib/companyIdentity.test.ts src/lib/companyOidc.test.ts",
+    "identity:reconcile": "tsx scripts/reconcile-company-identity.ts",
     "check": "npm run typecheck && npm run build",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
