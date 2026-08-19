@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   desiredIdentityRoles,
+  identityProfileName,
   setCompanyIdentityTemporaryPassword,
   syncCompanyIdentity,
 } from "./companyIdentity";
@@ -74,6 +75,21 @@ test("inactive employee receives no managed roles", () => {
   );
 });
 
+test("employee names always produce a complete Keycloak profile", () => {
+  assert.deepEqual(identityProfileName("추동현"), {
+    firstName: "동현",
+    lastName: "추",
+  });
+  assert.deepEqual(identityProfileName("Test Employee"), {
+    firstName: "Test",
+    lastName: "Employee",
+  });
+  assert.deepEqual(identityProfileName("WEIHUANG"), {
+    firstName: "WEIHUANG",
+    lastName: "-",
+  });
+});
+
 test("new active employee is created and assigned managed roles", async () => {
   configureIdentity("test-create-client");
   const originalFetch = globalThis.fetch;
@@ -126,7 +142,8 @@ test("new active employee is created and assigned managed roles", async () => {
     assert.deepEqual(create?.body, {
       username: "employee@example.test",
       email: "employee@example.test",
-      firstName: "Test Employee",
+      firstName: "Test",
+      lastName: "Employee",
       enabled: true,
       emailVerified: true,
       attributes: {
@@ -145,6 +162,77 @@ test("new active employee is created and assigned managed roles", async () => {
       (roleWrite?.body as Array<{ name: string }>).map((role) => role.name),
       ["company_employee", "workboard_user", "hr_user"],
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("existing employee profile is completed without clearing password actions", async () => {
+  configureIdentity("test-profile-client");
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: string; method: string; body?: unknown }> = [];
+  globalThis.fetch = async (input, init = {}) => {
+    const url = String(input);
+    const method = init.method ?? "GET";
+    const body = typeof init.body === "string" ? JSON.parse(init.body) : undefined;
+    requests.push({ url, method, body });
+
+    if (url.endsWith("/protocol/openid-connect/token")) {
+      return Response.json({ access_token: "test-token", expires_in: 60 });
+    }
+    if (url.includes("/users?") && method === "GET") {
+      return Response.json([
+        {
+          id: "identity-1",
+          username: "employee@example.test",
+          requiredActions: ["UPDATE_PROFILE", "UPDATE_PASSWORD"],
+        },
+      ]);
+    }
+    if (url.endsWith("/users/identity-1") && method === "PUT") {
+      return new Response(null, { status: 204 });
+    }
+    if (url.includes("/roles?first=0&max=500")) {
+      return Response.json([
+        { id: "1", name: "company_employee" },
+        { id: "2", name: "company_admin" },
+        { id: "3", name: "workboard_user" },
+        { id: "4", name: "hr_user" },
+        { id: "5", name: "hr_admin" },
+      ]);
+    }
+    if (url.endsWith("/role-mappings/realm") && method === "GET") {
+      return Response.json([
+        { id: "1", name: "company_employee" },
+        { id: "3", name: "workboard_user" },
+        { id: "4", name: "hr_user" },
+      ]);
+    }
+    throw new Error(`Unexpected request: ${method} ${url}`);
+  };
+
+  try {
+    const result = await syncCompanyIdentity(employee());
+    assert.equal(result.state, "synced");
+    const update = requests.find(
+      (request) =>
+        request.url.endsWith("/users/identity-1") && request.method === "PUT",
+    );
+    assert.deepEqual(update?.body, {
+      username: "employee@example.test",
+      email: "employee@example.test",
+      firstName: "Test",
+      lastName: "Employee",
+      enabled: true,
+      emailVerified: true,
+      attributes: {
+        employee_id: ["employee-1"],
+        employee_code: ["E001"],
+        department: ["Operations"],
+        position: ["Manager"],
+      },
+      requiredActions: ["UPDATE_PASSWORD"],
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }
