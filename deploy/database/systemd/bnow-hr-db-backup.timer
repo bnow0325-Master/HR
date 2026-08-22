@@ -1,0 +1,11 @@
+[Unit]
+Description=Run BNOW HR PostgreSQL backup every day
+
+[Timer]
+OnCalendar=*-*-* 03:10:00 Asia/Seoul
+RandomizedDelaySec=15m
+Persistent=true
+Unit=bnow-hr-db-backup.service
+
+[Install]
+WantedBy=timers.target

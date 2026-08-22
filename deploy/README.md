@@ -12,6 +12,10 @@ BNOW HR은 Ubuntu 운영 서버에서 Docker Compose로 실행하고, 호스트 
 - 인증: 자체 Keycloak의 `hr-server` confidential OIDC client
 - 환경변수: 서버의 `/opt/bnow/checkinout/.env.production.local`에만 저장
 
+Neon에서 자체 PostgreSQL로 이전하는 격리 구성과 백업 절차는
+[`database/README.md`](./database/README.md)를 따른다. 자체 DB의 복원 시험과
+데이터 검증이 끝날 때까지 운영 앱의 `DATABASE_URL`은 변경하지 않는다.
+
 ## 배포
 
 ```bash
