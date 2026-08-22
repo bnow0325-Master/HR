@@ -36,7 +36,13 @@ export default async function EmploymentCertificatesPage() {
             재직 직원을 선택해 증명서를 미리보고 인쇄하거나 PDF로 저장합니다.
           </p>
         </div>
-        <div className="flex gap-2 text-sm">
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Link
+            href="/admin/authorization-letters"
+            className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 font-semibold text-rose-700 hover:bg-rose-100"
+          >
+            위임장 발급
+          </Link>
           <Link
             href="/admin/employees"
             className="rounded-full border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
