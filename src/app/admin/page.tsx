@@ -375,7 +375,13 @@ export default async function AdminPage({
             직원별 출퇴근, 휴가 잔여량, 휴가·출장 신청 현황을 한곳에서 확인합니다.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Link
+            href="/admin/authorization-letters"
+            className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 font-semibold text-rose-700 hover:bg-rose-100"
+          >
+            위임장 발급
+          </Link>
           <Link
             href="/admin/employment-certificates"
             className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 font-semibold text-blue-700 hover:bg-blue-100"

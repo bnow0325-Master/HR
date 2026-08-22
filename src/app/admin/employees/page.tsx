@@ -628,7 +628,13 @@ export default function EmployeesAdminPage() {
             직원 원장을 기준으로 인사관리와 WorkBoard 권한을 관리합니다.
           </p>
         </div>
-        <div className="flex gap-3 text-sm">
+        <div className="flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/admin/authorization-letters"
+            className="font-medium text-slate-600 hover:underline"
+          >
+            위임장 발급
+          </Link>
           <Link
             href="/admin/employment-certificates"
             className="font-medium text-slate-600 hover:underline"

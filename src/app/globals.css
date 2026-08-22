@@ -981,8 +981,283 @@ textarea:focus {
   font-size: 0.64rem;
 }
 
+.authorization-letter {
+  position: relative;
+  width: min(210mm, 100%);
+  min-height: 297mm;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid #d9e0ea;
+  background: #fff;
+  padding: 18mm 19mm 16mm;
+  color: #172033;
+  box-shadow: 0 25px 80px rgba(15, 23, 42, 0.16);
+}
+
+.authorization-accent {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5mm;
+  background: #9f2424;
+}
+
+.authorization-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  padding-top: 3mm;
+  padding-bottom: 7mm;
+}
+
+.authorization-brand {
+  color: #9f2424;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+}
+
+.authorization-document-number {
+  margin-top: 0.35rem;
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.authorization-mark {
+  display: grid;
+  width: 12mm;
+  height: 12mm;
+  place-items: center;
+  border: 1px solid #9f2424;
+  color: #9f2424;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.authorization-letter > h1 {
+  margin-top: 12mm;
+  text-align: center;
+  font-size: 2.35rem;
+  font-weight: 900;
+  letter-spacing: 0.4em;
+}
+
+.authorization-subtitle {
+  margin-top: 0.35rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.authorization-parties {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5mm;
+  margin-top: 12mm;
+}
+
+.authorization-parties > div {
+  border: 1px solid #cbd5e1;
+}
+
+.authorization-parties h2 {
+  border-bottom: 1px solid #cbd5e1;
+  background: #f8fafc;
+  padding: 2.5mm 4mm;
+  color: #475569;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.authorization-parties dl {
+  display: grid;
+  gap: 1.4mm;
+  padding: 3.5mm 4mm;
+}
+
+.authorization-parties dl > div {
+  display: grid;
+  grid-template-columns: 22mm minmax(0, 1fr);
+  gap: 2mm;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.authorization-parties dt {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.authorization-parties dd {
+  color: #172033;
+  font-weight: 800;
+}
+
+.authorization-mandate {
+  margin-top: 6mm;
+  border: 1px solid #b9c5d6;
+}
+
+.authorization-mandate-heading {
+  display: grid;
+  grid-template-columns: 35mm minmax(0, 1fr);
+  border-bottom: 2px solid #172033;
+}
+
+.authorization-mandate-heading span,
+.authorization-mandate-heading strong {
+  display: flex;
+  align-items: center;
+  min-height: 12mm;
+  padding: 2.5mm 4mm;
+}
+
+.authorization-mandate-heading span {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.authorization-mandate-heading strong {
+  border-left: 1px solid #b9c5d6;
+  font-size: 0.93rem;
+}
+
+.authorization-mandate dl > div {
+  display: grid;
+  grid-template-columns: 35mm minmax(0, 1fr);
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.authorization-mandate dl > div:last-child {
+  border-bottom: 0;
+}
+
+.authorization-mandate dt,
+.authorization-mandate dd {
+  display: flex;
+  align-items: center;
+  min-height: 11mm;
+  padding: 2.5mm 4mm;
+}
+
+.authorization-mandate dt {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.authorization-mandate dd {
+  border-left: 1px solid #cbd5e1;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.authorization-mandate .authorization-scope dt,
+.authorization-mandate .authorization-scope dd {
+  min-height: 20mm;
+  align-items: flex-start;
+}
+
+.authorization-statement {
+  margin-top: 8mm;
+  text-align: center;
+}
+
+.authorization-statement p {
+  margin: 0 auto;
+  max-width: 150mm;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.9;
+}
+
+.authorization-statement time {
+  display: block;
+  margin-top: 6mm;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.authorization-signature {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7mm;
+  margin-top: 7mm;
+  padding-right: 4mm;
+}
+
+.authorization-signature > div:first-child {
+  display: grid;
+  gap: 1.5mm;
+  min-width: 58mm;
+  text-align: right;
+}
+
+.authorization-signature span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.authorization-signature strong {
+  font-size: 0.96rem;
+}
+
+.authorization-signature b {
+  font-size: 0.86rem;
+}
+
+.authorization-electronic-seal {
+  display: grid;
+  width: 25mm;
+  height: 25mm;
+  place-content: center;
+  border: 2px double #b91c1c;
+  color: #b91c1c;
+  text-align: center;
+  line-height: 1.05;
+}
+
+.authorization-electronic-seal span,
+.authorization-electronic-seal small {
+  color: inherit;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.authorization-electronic-seal strong {
+  margin: 1.5mm 0;
+  border-block: 1px solid #b91c1c;
+  padding: 1.5mm 0;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+}
+
+.authorization-validity-note {
+  position: absolute;
+  right: 19mm;
+  bottom: 11mm;
+  left: 19mm;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 3mm;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.62rem;
+}
+
 @media (max-width: 700px) {
-  .employment-certificate {
+  .employment-certificate,
+  .authorization-letter {
     min-width: 700px;
   }
 
@@ -1015,7 +1290,8 @@ textarea:focus {
     background: #fff;
   }
 
-  .employment-certificate {
+  .employment-certificate,
+  .authorization-letter {
     width: 210mm;
     min-height: 297mm;
     border: 0;
