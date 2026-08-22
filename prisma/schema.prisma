@@ -13,6 +13,7 @@ model Employee {
   department        String?
   position          String?
   email             String?            @unique
+  externalLoginId   String?            @unique
   phone             String?
   personalEmail     String?            @unique
   homeAddress       String?
@@ -31,8 +32,40 @@ model Employee {
   records           AttendanceRecord[]
   leaveRequests     LeaveRequest[]
   businessTrips     BusinessTrip[]
+  naverWorksDailyRecords NaverWorksDailyRecord[]
 
   @@index([active, code])
+}
+
+model NaverWorksDailyRecord {
+  id                    String    @id @default(cuid())
+  employee              Employee  @relation(fields: [employeeId], references: [id])
+  employeeId            String
+  baseDate              DateTime  @db.Date
+  workStyle             String?
+  workType              String?
+  schedule              String?
+  checkInAt             DateTime?
+  checkOutAt            DateTime?
+  checkInRaw            String?
+  checkOutRaw           String?
+  workLocation          String?
+  breakMinutes          Int       @default(0)
+  offsiteMinutes        Int       @default(0)
+  absenceMinutes        Int       @default(0)
+  late                  Boolean   @default(false)
+  earlyLeave            Boolean   @default(false)
+  requiredWorkCompliant String?
+  scheduleCompliant     String?
+  scheduleVariance      String?
+  sourceLoginId         String
+  sourceRow             Int
+  importedAt            DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([employeeId, baseDate])
+  @@index([baseDate])
+  @@index([sourceLoginId])
 }
 
 model AttendanceRecord {
