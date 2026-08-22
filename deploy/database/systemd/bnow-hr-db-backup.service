@@ -1,0 +1,24 @@
+[Unit]
+Description=BNOW HR PostgreSQL backup
+Requires=docker.service
+After=docker.service
+ConditionPathExists=/opt/bnow/hr-database/.env
+ConditionPathExists=/opt/bnow/hr-database/compose.yml
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/opt/bnow/hr-database/bin/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/bnow/hr-database/backups
+
+[Install]
+WantedBy=multi-user.target
