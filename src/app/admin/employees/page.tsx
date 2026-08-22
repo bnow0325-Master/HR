@@ -629,6 +629,12 @@ export default function EmployeesAdminPage() {
           </p>
         </div>
         <div className="flex gap-3 text-sm">
+          <Link
+            href="/admin/employment-certificates"
+            className="font-medium text-slate-600 hover:underline"
+          >
+            재직증명서 발급
+          </Link>
           <Link href="/leave" className="font-medium text-brand hover:underline">
             인사관리
           </Link>
