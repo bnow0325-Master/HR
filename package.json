@@ -27,25 +27,25 @@
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "html5-qrcode": "^2.3.8",
-    "jose": "^6.1.0",
-    "next": "^16.3.1",
-    "otplib": "^13.4.1",
-    "pg": "^8.22.0",
+    "jose": "^6.2.10",
+    "next": "^16.3.2",
+    "otplib": "^13.5.0",
+    "pg": "^8.23.0",
     "qrcode": "^1.5.4",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.2",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.10.5",
     "@types/qrcode": "^1.5.5",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "dotenv": "^17.4.2",
     "postcss": "^8.5.26",
     "prisma": "^7.9.1",
     "tailwindcss": "^4.3.2",
-    "tsx": "^4.19.2",
+    "tsx": "^4.23.12",
     "typescript": "^5.9.3"
   }
 }
