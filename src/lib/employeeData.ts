@@ -16,6 +16,7 @@ export const employeeSelect = {
   attendanceEnabled: true,
   leaveEnabled: true,
   workboardEnabled: true,
+  profilePhotoUpdatedAt: true,
   active: true,
   createdAt: true,
   updatedAt: true,

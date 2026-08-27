@@ -22,6 +22,7 @@ type Employee = {
   attendanceEnabled: boolean;
   leaveEnabled: boolean;
   workboardEnabled: boolean;
+  profilePhotoUpdatedAt: string | null;
   active: boolean;
 };
 
@@ -68,6 +69,7 @@ const DEVELOPMENT_EMPLOYEE: Employee = {
   attendanceEnabled: true,
   leaveEnabled: true,
   workboardEnabled: false,
+  profilePhotoUpdatedAt: null,
   active: true,
 };
 
@@ -119,6 +121,7 @@ function normalizeEmployee(employee: Partial<Employee>): Employee {
       active &&
       Boolean(employee.email) &&
       employee.workboardEnabled !== false,
+    profilePhotoUpdatedAt: employee.profilePhotoUpdatedAt ?? null,
     active,
   };
 }
@@ -1046,13 +1049,28 @@ export default function EmployeesAdminPage() {
                     {employee.code}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="font-semibold text-slate-800">
-                      {employee.name}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-400">
-                      {[employee.department, employee.position]
-                        .filter(Boolean)
-                        .join(" · ") || "부서 미지정"}
+                    <div className="flex items-center gap-3">
+                      {employee.profilePhotoUpdatedAt ? (
+                        <img
+                          src={`/api/admin/employees/${encodeURIComponent(employee.id)}/photo?v=${new Date(employee.profilePhotoUpdatedAt).getTime()}`}
+                          alt={`${employee.name} 프로필 사진`}
+                          className="h-11 w-11 shrink-0 rounded-full border border-slate-200 object-cover"
+                        />
+                      ) : (
+                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-500" aria-hidden="true">
+                          {[...employee.name].slice(-2).join("")}
+                        </span>
+                      )}
+                      <div>
+                        <div className="font-semibold text-slate-800">
+                          {employee.name}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          {[employee.department, employee.position]
+                            .filter(Boolean)
+                            .join(" · ") || "부서 미지정"}
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-slate-600">
