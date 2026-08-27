@@ -14,6 +14,7 @@ const profileSelect = {
   personalEmail: true,
   homeAddress: true,
   emergencyContactPhone: true,
+  profilePhotoUpdatedAt: true,
   updatedAt: true,
 } as const;
 
@@ -25,6 +26,18 @@ type ProfileBody = {
 
 async function currentEmployee() {
   return getCurrentWorkboardEmployee("any");
+}
+
+function profileResponse<T extends { profilePhotoUpdatedAt: Date | null }>(
+  profile: T,
+) {
+  return {
+    ...profile,
+    hasProfilePhoto: Boolean(profile.profilePhotoUpdatedAt),
+    profilePhotoUrl: profile.profilePhotoUpdatedAt
+      ? `/api/profile/photo?v=${profile.profilePhotoUpdatedAt.getTime()}`
+      : null,
+  };
 }
 
 export async function GET() {
@@ -48,7 +61,7 @@ export async function GET() {
   }
 
   return NextResponse.json(
-    { profile },
+    { profile: profileResponse(profile) },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -151,5 +164,5 @@ export async function PATCH(request: Request) {
     select: profileSelect,
   });
 
-  return NextResponse.json({ ok: true, profile });
+  return NextResponse.json({ ok: true, profile: profileResponse(profile) });
 }

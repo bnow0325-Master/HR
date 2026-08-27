@@ -18,6 +18,9 @@ model Employee {
   personalEmail     String?            @unique
   homeAddress       String?
   emergencyContactPhone String?
+  profilePhotoData  Bytes?
+  profilePhotoMimeType String?
+  profilePhotoUpdatedAt DateTime?
   hireDate          DateTime?
   terminationDate   DateTime?
   workMinutesPerDay Int                @default(480)

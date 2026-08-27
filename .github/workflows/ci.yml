@@ -58,6 +58,9 @@ jobs:
       - name: Test company identity integration
         run: npm run test:identity
 
+      - name: Test profile photo validation
+        run: npm run test:profile-photo
+
       - name: Type-check
         run: npm run typecheck
 

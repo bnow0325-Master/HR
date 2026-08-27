@@ -30,7 +30,7 @@ const attendanceMenus = [
     href: "/profile",
     eyebrow: "MY PROFILE",
     title: "내 정보 관리",
-    description: "개인 연락처를 수정하고 WorkBoard 비밀번호를 변경합니다.",
+    description: "프로필 사진과 개인 연락처를 관리하고 비밀번호를 변경합니다.",
   },
   {
     href: "/admin/employees",

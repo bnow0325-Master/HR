@@ -113,6 +113,7 @@ export async function getCurrentWorkboardEmployee(
       attendanceEnabled: true,
       leaveEnabled: true,
       workboardEnabled: true,
+      profilePhotoUpdatedAt: true,
       active: true,
     },
   });

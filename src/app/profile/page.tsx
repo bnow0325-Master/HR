@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { workboardLoginUrl } from "@/lib/workboardSsoClient";
+import { PROFILE_PHOTO_MAX_BYTES } from "@/lib/profilePhoto";
 
 type Profile = {
   code: string;
@@ -13,6 +14,9 @@ type Profile = {
   personalEmail: string | null;
   homeAddress: string | null;
   emergencyContactPhone: string | null;
+  hasProfilePhoto: boolean;
+  profilePhotoUrl: string | null;
+  profilePhotoUpdatedAt: string | null;
   updatedAt: string;
 };
 
@@ -29,14 +33,32 @@ const EMPTY_DRAFT: ProfileDraft = {
 };
 
 export default function ProfilePage() {
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [draft, setDraft] = useState<ProfileDraft>(EMPTY_DRAFT);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [photoSaving, setPhotoSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState<{
     ok: boolean;
     text: string;
   } | null>(null);
+  const [photoMessage, setPhotoMessage] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!selectedPhoto) {
+      setPhotoPreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(selectedPhoto);
+    setPhotoPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedPhoto]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +143,108 @@ export default function ProfilePage() {
     }
   }
 
+  function choosePhoto(file: File | null) {
+    setPhotoMessage(null);
+    if (!file) {
+      setSelectedPhoto(null);
+      return;
+    }
+    if (file.size > PROFILE_PHOTO_MAX_BYTES) {
+      setSelectedPhoto(null);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+      setPhotoMessage({
+        ok: false,
+        text: "프로필 사진은 2MB 이하만 등록할 수 있습니다.",
+      });
+      return;
+    }
+    setSelectedPhoto(file);
+  }
+
+  async function uploadPhoto() {
+    if (!selectedPhoto) return;
+    setPhotoSaving(true);
+    setPhotoMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.set("photo", selectedPhoto);
+      const response = await fetch("/api/profile/photo", {
+        method: "PUT",
+        body: formData,
+      });
+      const data = (await response.json()) as {
+        profilePhotoUpdatedAt?: string;
+        profilePhotoUrl?: string;
+        error?: string;
+      };
+      if (!response.ok || !data.profilePhotoUrl) {
+        throw new Error(data.error ?? "프로필 사진 등록에 실패했습니다.");
+      }
+
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              hasProfilePhoto: true,
+              profilePhotoUrl: data.profilePhotoUrl ?? null,
+              profilePhotoUpdatedAt: data.profilePhotoUpdatedAt ?? null,
+            }
+          : current,
+      );
+      setSelectedPhoto(null);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+      setPhotoMessage({ ok: true, text: "프로필 사진을 등록했습니다." });
+    } catch (error) {
+      setPhotoMessage({
+        ok: false,
+        text:
+          error instanceof Error
+            ? error.message
+            : "프로필 사진 등록에 실패했습니다.",
+      });
+    } finally {
+      setPhotoSaving(false);
+    }
+  }
+
+  async function deletePhoto() {
+    if (!window.confirm("등록한 프로필 사진을 삭제할까요?")) return;
+    setPhotoSaving(true);
+    setPhotoMessage(null);
+
+    try {
+      const response = await fetch("/api/profile/photo", { method: "DELETE" });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "프로필 사진 삭제에 실패했습니다.");
+      }
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              hasProfilePhoto: false,
+              profilePhotoUrl: null,
+              profilePhotoUpdatedAt: null,
+            }
+          : current,
+      );
+      setSelectedPhoto(null);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+      setPhotoMessage({ ok: true, text: "프로필 사진을 삭제했습니다." });
+    } catch (error) {
+      setPhotoMessage({
+        ok: false,
+        text:
+          error instanceof Error
+            ? error.message
+            : "프로필 사진 삭제에 실패했습니다.",
+      });
+    } finally {
+      setPhotoSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="mx-auto max-w-4xl px-6 py-16 text-center text-sm text-slate-500">
@@ -143,22 +267,87 @@ export default function ProfilePage() {
 
       {profile && (
         <section className="mb-6 rounded-2xl border border-slate-200 bg-slate-950 p-6 text-white shadow-sm">
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <Identity label="이름" value={profile.name} />
-            <Identity label="사번" value={profile.code} />
-            <Identity
-              label="부서 · 직급"
-              value={
-                [profile.department, profile.position]
-                  .filter(Boolean)
-                  .join(" · ") || "미등록"
-              }
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+            <ProfileAvatar
+              name={profile.name}
+              src={photoPreviewUrl ?? profile.profilePhotoUrl}
+              className="h-24 w-24 border-4 border-slate-700"
             />
-            <Identity label="회사 이메일" value={profile.email ?? "미등록"} />
+            <div className="grid flex-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <Identity label="이름" value={profile.name} />
+              <Identity label="사번" value={profile.code} />
+              <Identity
+                label="부서 · 직급"
+                value={
+                  [profile.department, profile.position]
+                    .filter(Boolean)
+                    .join(" · ") || "미등록"
+                }
+              />
+              <Identity label="회사 이메일" value={profile.email ?? "미등록"} />
+            </div>
           </div>
           <p className="mt-5 border-t border-slate-700 pt-4 text-xs text-slate-400">
             회사 기준 정보 변경은 관리자에게 요청해 주세요.
           </p>
+        </section>
+      )}
+
+      {profile && (
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-5">
+            <h2 className="text-xl font-bold text-slate-900">프로필 사진</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              본인을 알아볼 수 있는 정면 사진을 등록해 주세요. JPEG, PNG, WebP
+              형식의 2MB 이하 파일만 사용할 수 있습니다.
+            </p>
+          </div>
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <ProfileAvatar
+              name={profile.name}
+              src={photoPreviewUrl ?? profile.profilePhotoUrl}
+              className="h-32 w-32 border-4 border-slate-100"
+            />
+            <div className="flex-1">
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => choosePhoto(event.target.files?.[0] ?? null)}
+                className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-100 file:px-4 file:py-3 file:text-sm file:font-bold file:text-slate-800 hover:file:bg-slate-200"
+              />
+              {selectedPhoto && (
+                <p className="mt-2 text-xs text-slate-500">
+                  선택한 파일: {selectedPhoto.name}
+                </p>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={!selectedPhoto || photoSaving}
+                  onClick={() => void uploadPhoto()}
+                  className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {photoSaving ? "처리 중..." : "선택한 사진 등록"}
+                </button>
+                {profile.hasProfilePhoto && (
+                  <button
+                    type="button"
+                    disabled={photoSaving}
+                    onClick={() => void deletePhoto()}
+                    className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    등록 사진 삭제
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          {photoMessage && (
+            <div className="mt-4">
+              <Message ok={photoMessage.ok}>{photoMessage.text}</Message>
+            </div>
+          )}
         </section>
       )}
 
@@ -263,6 +452,30 @@ function Identity({ label, value }: { label: string; value: string }) {
     <div>
       <div className="text-xs font-medium text-slate-400">{label}</div>
       <div className="mt-1 break-words text-sm font-bold text-white">{value}</div>
+    </div>
+  );
+}
+
+function ProfileAvatar({
+  name,
+  src,
+  className,
+}: {
+  name: string;
+  src: string | null;
+  className: string;
+}) {
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-600 text-2xl font-black text-white ${className}`}
+      aria-label={`${name} 프로필 사진`}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={`${name} 프로필`} className="h-full w-full object-cover" />
+      ) : (
+        <span aria-hidden="true">{name.trim().slice(0, 1) || "?"}</span>
+      )}
     </div>
   );
 }
