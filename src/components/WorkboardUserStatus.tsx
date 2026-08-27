@@ -12,6 +12,7 @@ type CurrentEmployee = {
   name: string;
   code: string;
   department: string | null;
+  profilePhotoUpdatedAt: string | null;
 };
 
 export default function WorkboardUserStatus() {
@@ -19,7 +20,12 @@ export default function WorkboardUserStatus() {
   const isDevelopment = process.env.NODE_ENV === "development";
   const [employee, setEmployee] = useState<CurrentEmployee | null>(
     isDevelopment
-      ? { name: "추동현", code: "DEV", department: "개발 사용자" }
+      ? {
+          name: "추동현",
+          code: "DEV",
+          department: "개발 사용자",
+          profilePhotoUpdatedAt: null,
+        }
       : null,
   );
   const [loading, setLoading] = useState(!isDevelopment);
@@ -79,7 +85,18 @@ export default function WorkboardUserStatus() {
         aria-label={`${employee.name} 내 정보 관리`}
         title="내 정보 관리"
       >
-        <span className="top-nav-user-dot" />
+        <span className="top-nav-user-avatar" aria-hidden="true">
+          {employee.profilePhotoUpdatedAt ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/profile/photo?v=${new Date(employee.profilePhotoUpdatedAt).getTime()}`}
+              alt=""
+            />
+          ) : (
+            employee.name.trim().slice(0, 1)
+          )}
+          <span className="top-nav-user-presence" />
+        </span>
         <strong>{employee.name}</strong>
         <span>{employee.department || `사번 ${employee.code}`}</span>
       </Link>
