@@ -79,6 +79,13 @@ secret이나 access token을 저장하지 않습니다.
 일회성 비밀번호를 기록하며, 사용자는 다음 로그인에서 새 비밀번호로 변경해야 합니다.
 이 코드 경로에는 Supabase URL·키·Auth API가 필요하지 않습니다.
 
+퇴사, `workboardEnabled` 해제 또는 회사 이메일 변경 시 HR은 LC_CHAT 내부 API를
+호출해 해당 직원의 라이브카우톡 세션과 푸시 기기를 함께 폐기합니다. 필요한
+`CUSTOMER_CHAT_INTERNAL_URL`과 `CUSTOMER_CHAT_INTERNAL_KEY`가 없거나 호출에
+실패하면 HR 변경을 저장하지 않고 `persisted=false`와 HTTP 502를 반환하므로,
+이메일 변경 후 기존 세션이 남는 재시도 누락도 방지합니다. LC_CHAT도 매 요청에서 최대 60초
+간격으로 HR 권한을 재확인해 연동 장애 시 권한이 계속 유지되지 않게 합니다.
+
 ## 검사와 배포
 
 ```powershell

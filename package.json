@@ -12,7 +12,7 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
-    "test:identity": "tsx --test src/lib/companyIdentity.test.ts src/lib/companyOidc.test.ts",
+    "test:identity": "tsx --test src/lib/companyIdentity.test.ts src/lib/companyOidc.test.ts src/lib/customerChatAccess.test.ts",
     "test:profile-photo": "tsx --test src/lib/profilePhoto.test.ts",
     "identity:reconcile": "tsx scripts/reconcile-company-identity.ts",
     "check": "npm run typecheck && npm run build",

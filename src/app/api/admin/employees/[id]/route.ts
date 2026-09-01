@@ -9,6 +9,7 @@ import {
   validPhone,
 } from "@/lib/employeeData";
 import { syncCompanyIdentity } from "@/lib/companyIdentity";
+import { revokeCustomerChatAccess } from "@/lib/customerChatAccess";
 
 type UpdateEmployeeBody = {
   code?: string;
@@ -271,6 +272,26 @@ export async function PATCH(
     );
   }
 
+  const previousEmail = existing.email?.trim().toLowerCase() || null;
+  const currentEmail = nextEmail?.trim().toLowerCase() || null;
+  const nextWorkboardEnabled =
+    data.workboardEnabled ?? existing.workboardEnabled;
+  const customerChatRevocation = await revokeCustomerChatAccess([
+    previousEmail && previousEmail !== currentEmail ? previousEmail : null,
+    !nextActive || !nextWorkboardEnabled ? currentEmail : null,
+  ]);
+  if (!customerChatRevocation.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        persisted: false,
+        error: customerChatRevocation.message,
+        customerChatRevocation,
+      },
+      { status: 502 },
+    );
+  }
+
   const employee = await prisma.employee.update({
     where: { id },
     data,
@@ -280,8 +301,10 @@ export async function PATCH(
 
   return NextResponse.json({
     ok: true,
+    persisted: true,
     employee,
     identitySync,
+    customerChatRevocation,
   });
 }
 
@@ -305,6 +328,21 @@ export async function DELETE(
     );
   }
 
+  const customerChatRevocation = await revokeCustomerChatAccess([
+    existing.email,
+  ]);
+  if (!customerChatRevocation.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        persisted: false,
+        error: customerChatRevocation.message,
+        customerChatRevocation,
+      },
+      { status: 502 },
+    );
+  }
+
   const employee = await prisma.employee.update({
     where: { id },
     data: {
@@ -320,7 +358,9 @@ export async function DELETE(
 
   return NextResponse.json({
     ok: true,
+    persisted: true,
     employee,
     identitySync,
+    customerChatRevocation,
   });
 }
