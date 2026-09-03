@@ -19,13 +19,13 @@ BNOW HR은 임직원의 인사 정보를 한곳에서 관리하는 내부 시스
 - 로컬 기준 경로: `D:\project\hr`
 - 운영 URL: `https://hr.bnow.co.kr`
 - 배포: Ubuntu 자체 서버 + Docker Compose + Nginx + Let's Encrypt
-- 데이터베이스: Neon PostgreSQL
+- 데이터베이스: 자체 서버 HR 전용 MariaDB 11.4
 
 ## 기술 스택
 
 - Node.js 22, Next.js 16 App Router, React 19, TypeScript 5.9 strict
 - Tailwind CSS 4
-- Prisma 7 + PostgreSQL 드라이버 어댑터(`@prisma/adapter-pg`)
+- Prisma 7 + MariaDB 드라이버 어댑터(`@prisma/adapter-mariadb`)
 - otplib 13, qrcode, html5-qrcode
 
 ## 작업 원칙
@@ -38,6 +38,7 @@ BNOW HR은 임직원의 인사 정보를 한곳에서 관리하는 내부 시스
 6. 직원명부 변경과 관리자 기능은 관리자 인증 뒤에 둔다.
 7. DB 스키마 변경 시 마이그레이션을 함께 커밋하고 롤백 방법을 PR에 기록한다.
 8. 운영 배포 전 자체 서버의 HTTPS, DB 연결, 주요 화면과 API를 검증한다.
+9. 출퇴근 위치는 서버 검증과 내부 좌표 저장에만 사용하고 직원 화면·일반 API에는 노출하지 않는다.
 
 ## 필수 명령
 

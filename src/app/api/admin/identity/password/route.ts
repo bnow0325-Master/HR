@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   }
 
   const employee = await prisma.employee.findFirst({
-    where: { email: { equals: email, mode: "insensitive" } },
+    where: { email: { equals: email } },
     select: {
       id: true,
       code: true,

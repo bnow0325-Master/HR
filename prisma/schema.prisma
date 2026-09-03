@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
 }
 
 model Employee {
@@ -16,7 +16,7 @@ model Employee {
   externalLoginId   String?            @unique
   phone             String?
   personalEmail     String?            @unique
-  homeAddress       String?
+  homeAddress       String?            @db.Text
   emergencyContactPhone String?
   profilePhotoData  Bytes?
   profilePhotoMimeType String?
@@ -47,20 +47,20 @@ model NaverWorksDailyRecord {
   baseDate              DateTime  @db.Date
   workStyle             String?
   workType              String?
-  schedule              String?
+  schedule              String?   @db.Text
   checkInAt             DateTime?
   checkOutAt            DateTime?
-  checkInRaw            String?
-  checkOutRaw           String?
-  workLocation          String?
+  checkInRaw            String?   @db.Text
+  checkOutRaw           String?   @db.Text
+  workLocation          String?   @db.Text
   breakMinutes          Int       @default(0)
   offsiteMinutes        Int       @default(0)
   absenceMinutes        Int       @default(0)
   late                  Boolean   @default(false)
   earlyLeave            Boolean   @default(false)
-  requiredWorkCompliant String?
-  scheduleCompliant     String?
-  scheduleVariance      String?
+  requiredWorkCompliant String?   @db.Text
+  scheduleCompliant     String?   @db.Text
+  scheduleVariance      String?   @db.Text
   sourceLoginId         String
   sourceRow             Int
   importedAt            DateTime  @default(now())
@@ -81,7 +81,7 @@ model AttendanceRecord {
   verified    Boolean   @default(false)
   latitude    Float?
   longitude   Float?
-  note        String?
+  note        String?    @db.Text
   cancelledAt DateTime?
   cancelNote  String?
   createdAt   DateTime  @default(now())
@@ -97,9 +97,9 @@ model LeaveRequest {
   leaveType      String
   leaveDate      DateTime
   unitsMinutes   Int
-  reason         String?
+  reason         String?   @db.Text
   status         String   @default("PENDING")
-  reviewerNote   String?
+  reviewerNote   String?   @db.Text
   reviewedAt     DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -114,7 +114,7 @@ model BusinessTrip {
   employeeId String
   startDate  DateTime
   endDate    DateTime
-  reason     String
+  reason     String   @db.Text
   status     String   @default("REGISTERED")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

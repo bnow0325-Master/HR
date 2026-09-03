@@ -19,21 +19,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
-      postgres:
-        image: postgres:16
+      mariadb:
+        image: mariadb:11.4
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: checkinout
+          MARIADB_ROOT_PASSWORD: root-ci-only
+          MARIADB_USER: hr_ci
+          MARIADB_PASSWORD: hr-ci-only
+          MARIADB_DATABASE: bnow_hr
         ports:
-          - 5432:5432
+          - 3306:3306
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 12
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/checkinout?schema=public
+      DATABASE_URL: mysql://hr_ci:hr-ci-only@127.0.0.1:3306/bnow_hr
       OFFICE_LATITUDE: "37.5636"
       OFFICE_LONGITUDE: "126.9868"
       OFFICE_RADIUS_METERS: "150"
@@ -54,6 +55,9 @@ jobs:
 
       - name: Apply migrations
         run: npx prisma migrate deploy
+
+      - name: Test MariaDB configuration
+        run: npm run test:database
 
       - name: Test company identity integration
         run: npm run test:identity

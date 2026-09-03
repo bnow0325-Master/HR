@@ -9,7 +9,7 @@ BNOW 임직원의 출퇴근, 근무기록, 휴가, 출장, 직원명부를 통�
 - GitHub: [bnow0325-Master/HR](https://github.com/bnow0325-Master/HR)
 - 로컬 기준 경로: `D:\project\hr`
 - 배포: Ubuntu 자체 서버, Docker Compose, Nginx, Let's Encrypt
-- DB: Neon PostgreSQL
+- DB: 자체 서버 MariaDB 11.4
 
 ## 주요 기능
 
@@ -40,7 +40,7 @@ BNOW 임직원의 출퇴근, 근무기록, 휴가, 출장, 직원명부를 통�
 
 - Next.js 16, React 19, TypeScript 5.9
 - Tailwind CSS 4
-- Prisma 7, PostgreSQL(Neon)
+- Prisma 7, MariaDB 11.4
 - Docker Compose, Nginx, Let's Encrypt
 
 ## 로컬 실행

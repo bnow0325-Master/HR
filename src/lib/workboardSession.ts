@@ -94,7 +94,7 @@ export async function getCurrentWorkboardEmployee(
   return prisma.employee.findFirst({
     where: {
       id: session.employeeId,
-      email: { equals: session.email, mode: "insensitive" },
+      email: { equals: session.email },
       active: true,
       ...(capability === "workboard" ? { workboardEnabled: true } : {}),
       ...(capability === "attendance" ? { attendanceEnabled: true } : {}),

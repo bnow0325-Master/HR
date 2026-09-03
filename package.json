@@ -13,8 +13,10 @@
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
     "test:identity": "tsx --test src/lib/companyIdentity.test.ts src/lib/companyOidc.test.ts src/lib/customerChatAccess.test.ts",
+    "test:database": "tsx --test src/lib/mariaDbConfig.test.ts",
     "test:profile-photo": "tsx --test src/lib/profilePhoto.test.ts",
     "identity:reconcile": "tsx scripts/reconcile-company-identity.ts",
+    "db:migrate-data:mariadb": "tsx scripts/migrate-postgres-to-mariadb.ts",
     "check": "npm run typecheck && npm run build",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
@@ -24,10 +26,11 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/adapter-mariadb": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "html5-qrcode": "^2.3.8",
     "jose": "^6.1.0",
+    "mariadb": "^3.5.4",
     "next": "^16.3.1",
     "otplib": "^13.4.1",
     "pg": "^8.22.0",
@@ -38,6 +41,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
     "@types/node": "^22.10.5",
+    "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
@@ -47,5 +51,10 @@
     "tailwindcss": "^4.3.2",
     "tsx": "^4.19.2",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@prisma/adapter-mariadb": {
+      "mariadb": "3.5.4"
+    }
   }
 }

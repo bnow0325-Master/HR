@@ -246,14 +246,13 @@ export async function PATCH(
       OR: [
         { code: nextCode },
         ...(nextEmail
-          ? [{ email: { equals: nextEmail, mode: "insensitive" as const } }]
+          ? [{ email: { equals: nextEmail } }]
           : []),
         ...(nextPersonalEmail
           ? [
               {
                 personalEmail: {
                   equals: nextPersonalEmail,
-                  mode: "insensitive" as const,
                 },
               },
             ]
