@@ -12,6 +12,7 @@ if [[ "$(id -u)" != "0" ]]; then
 fi
 
 install -d -m 0700 "${BASE_DIR}" "${SECRETS_DIR}" "${BASE_DIR}/backups" "${BASE_DIR}/source-backups" "${BASE_DIR}/app-env-backups"
+chmod 0750 "${BASE_DIR}/bin/backup.sh" "${BASE_DIR}/bin/restore-smoke-test.sh"
 
 docker pull "${IMAGE_TAG}" >/dev/null
 image_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "${IMAGE_TAG}")"
