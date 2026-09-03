@@ -43,11 +43,15 @@
 
 ```bash
 sudo ./bin/provision.sh
-sudo ./bin/prepare-app-env.py prepare-migration
-sudo ./bin/backup-source-postgres.sh
+sudo ./bin/prepare-app-env.py prepare-migration --app-dir /opt/bnow/hr-releases/<commit>
+sudo ./bin/backup-source-postgres.sh /opt/bnow/hr-releases/<commit>
 # 앱 쓰기를 중지한 뒤 스키마와 데이터 이전·검증 수행
-sudo ./bin/prepare-app-env.py cutover
+sudo ./bin/prepare-app-env.py cutover --app-dir /opt/bnow/hr-releases/<commit>
 ```
+
+기존 `/opt/bnow/checkinout` 작업트리가 수정 상태이면 덮어쓰거나 초기화하지 않는다.
+검증된 `origin/main`을 `/opt/bnow/hr-releases/<commit>`에 분리하고 기존 환경파일만
+권한 `0600`으로 복사한 뒤 새 릴리스에서 Compose를 실행한다.
 
 ## 롤백
 

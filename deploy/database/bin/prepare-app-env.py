@@ -3,6 +3,7 @@ import argparse
 import datetime
 import json
 import os
+import re
 from pathlib import Path
 from urllib.parse import quote
 
@@ -72,8 +73,15 @@ def main() -> None:
 
     app_dir = Path(args.app_dir).resolve()
     database_dir = Path(args.database_dir).resolve()
-    if app_dir != Path("/opt/bnow/checkinout") or database_dir != Path(
-        "/opt/bnow/hr-mariadb"
+    canonical_app_dir = Path("/opt/bnow/checkinout")
+    releases_dir = Path("/opt/bnow/hr-releases")
+    is_release_dir = (
+        app_dir.parent == releases_dir
+        and re.fullmatch(r"[a-f0-9]{7,40}", app_dir.name) is not None
+    )
+    if (
+        (app_dir != canonical_app_dir and not is_release_dir)
+        or database_dir != Path("/opt/bnow/hr-mariadb")
     ):
         raise RuntimeError("Refusing to modify an unexpected server path.")
 
