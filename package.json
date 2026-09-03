@@ -26,30 +26,30 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@prisma/adapter-mariadb": "^7.9.1",
-    "@prisma/client": "^7.9.1",
+    "@prisma/adapter-mariadb": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "html5-qrcode": "^2.3.8",
-    "jose": "^6.1.0",
+    "jose": "^6.2.10",
     "mariadb": "^3.5.4",
-    "next": "^16.3.1",
-    "otplib": "^13.4.1",
-    "pg": "^8.22.0",
+    "next": "^16.3.3",
+    "otplib": "^13.5.0",
+    "pg": "^8.23.0",
     "qrcode": "^1.5.4",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.2",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.10.5",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.5",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "dotenv": "^17.4.2",
     "postcss": "^8.5.26",
-    "prisma": "^7.9.1",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4.3.2",
-    "tsx": "^4.19.2",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   },
   "overrides": {
