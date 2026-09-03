@@ -10,7 +10,10 @@ RUN npm ci
 
 FROM dependencies AS builder
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
+# Next.js imports route modules while collecting build metadata. Use a non-routable
+# placeholder so production credentials remain runtime-only and outside image layers.
+ENV NEXT_TELEMETRY_DISABLED=1 \
+  DATABASE_URL=mysql://build_user:build_password@127.0.0.1:3306/build_only
 RUN mkdir -p public && npm run build
 
 FROM dependencies AS migrate
