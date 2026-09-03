@@ -38,6 +38,17 @@
 7. 앱을 잠시 쓰기 중지하고 최종 복제를 다시 수행한 뒤 HR 앱만 MariaDB로 전환한다.
 8. 직원 로그인, 출퇴근, 휴가, 출장, 명부 관리 회귀 시험 후 백업 timer를 활성화한다.
 
+서버에서는 추적된 도구를 아래 순서로 사용한다. 스크립트는 비밀값을 출력하지 않으며
+앱 환경파일 변경 전 자동 백업을 남긴다.
+
+```bash
+sudo ./bin/provision.sh
+sudo ./bin/prepare-app-env.py prepare-migration
+sudo ./bin/backup-source-postgres.sh
+# 앱 쓰기를 중지한 뒤 스키마와 데이터 이전·검증 수행
+sudo ./bin/prepare-app-env.py cutover
+```
+
 ## 롤백
 
 기존 PostgreSQL은 삭제하거나 수정하지 않는다. 전환 실패 시 앱의 `DATABASE_URL`을
