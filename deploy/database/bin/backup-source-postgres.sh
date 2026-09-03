@@ -47,11 +47,11 @@ trap 'rm -f "${partial_path}"' EXIT
 umask 077
 docker run --rm -i \
   --env SOURCE_DATABASE_URL \
-  postgres:17-alpine \
+  postgres:18-alpine \
   sh -ec 'exec pg_dump --dbname "$SOURCE_DATABASE_URL" --format custom --compress 9 --no-owner --no-acl' \
   >"${partial_path}"
 
-docker run --rm -i postgres:17-alpine pg_restore --list <"${partial_path}" >/dev/null
+docker run --rm -i postgres:18-alpine pg_restore --list <"${partial_path}" >/dev/null
 mv "${partial_path}" "${backup_path}"
 sha256sum "${backup_path}" >"${backup_path}.sha256"
 chmod 0600 "${backup_path}" "${backup_path}.sha256"
