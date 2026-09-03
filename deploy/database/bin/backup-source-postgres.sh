@@ -2,12 +2,16 @@
 set -Eeuo pipefail
 
 BASE_DIR="${BNOW_HR_DB_DIR:-/opt/bnow/hr-mariadb}"
-APP_DIR="${BNOW_HR_APP_DIR:-/opt/bnow/checkinout}"
+APP_DIR="${1:-${BNOW_HR_APP_DIR:-/opt/bnow/checkinout}}"
 MIGRATION_ENV="${APP_DIR}/.env.migration.local"
 BACKUP_DIR="${BASE_DIR}/source-backups"
 
 if [[ "$(id -u)" != "0" ]]; then
   echo "Run this script as root." >&2
+  exit 1
+fi
+if [[ "${APP_DIR}" != "/opt/bnow/checkinout" && ! "${APP_DIR}" =~ ^/opt/bnow/hr-releases/[a-f0-9]{7,40}$ ]]; then
+  echo "Refusing to read an unexpected HR application path." >&2
   exit 1
 fi
 if [[ ! -r "${MIGRATION_ENV}" ]]; then
