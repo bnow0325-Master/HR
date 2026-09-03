@@ -141,7 +141,6 @@ export async function PATCH(request: Request) {
         id: { not: employee.id },
         personalEmail: {
           equals: personalEmail,
-          mode: "insensitive",
         },
       },
       select: { id: true },

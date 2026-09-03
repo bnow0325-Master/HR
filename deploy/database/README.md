@@ -1,46 +1,45 @@
-# BNOW HR PostgreSQL 자체 호스팅
+# BNOW HR MariaDB 자체 호스팅
 
-이 구성은 기존 시스템 PostgreSQL 16과 분리된 PostgreSQL 18 컨테이너를
-`1-ubuntu`에 만든다. HR 앱은 데이터 검증과 최종 전환이 끝날 때까지 Neon을
-계속 사용한다.
+이 구성은 HR 전용 MariaDB 11.4를 `1-ubuntu`에 만들며 WorkBoard의 PostgreSQL과
+채팅용 MariaDB를 수정하거나 공유하지 않는다. HR 앱은 복제·검증·백업이 모두 성공할
+때까지 기존 PostgreSQL을 계속 사용한다.
 
-## 안전 원칙
+## 격리 및 개인정보 원칙
 
-- PostgreSQL 포트를 호스트나 인터넷에 공개하지 않는다.
-- 데이터는 Docker 영구 볼륨 `bnow_hr_postgres_data`에 저장한다.
-- 비밀번호는 `/opt/bnow/hr-database/secrets/postgres_password`에만 저장한다.
-- 백업은 `/opt/bnow/hr-database/backups`에 권한 `0600`으로 저장한다.
-- 로컬 백업의 복원 시험이 성공해도 별도 서버 백업 전에는 운영 DB를 전환하지 않는다.
-- 현재 시스템 PostgreSQL 16과 그 데이터베이스는 수정하지 않는다.
+- DB 포트는 호스트와 인터넷에 공개하지 않는다.
+- HR 전용 데이터베이스 `bnow_hr`, 계정, Docker 볼륨을 사용한다.
+- 직원 화면과 일반 직원 API에는 출퇴근 좌표를 반환하지 않는다.
+- 출퇴근 시 위도·경도만 내부 저장하고 주소 문자열은 생성·저장하지 않는다.
+- 과거 `AttendanceRecord.note`의 주소 문자열은 MariaDB 이전 시 `NULL` 처리한다.
+- 비밀번호는 `/opt/bnow/hr-mariadb/secrets/`에만 저장하고 Git에 커밋하지 않는다.
+- 백업은 권한 `0600`, SHA-256 체크섬과 함께 14일 보관한다.
 
 ## 서버 파일
 
 ```text
-/opt/bnow/hr-database/
+/opt/bnow/hr-mariadb/
   .env
   compose.yml
   backups/
   bin/
-  secrets/postgres_password
+  secrets/mariadb_password
+  secrets/mariadb_root_password
 ```
 
-`.env`는 `.env.example`을 기준으로 서버에서 만들고 Git에 커밋하지 않는다.
-공식 PostgreSQL 이미지는 서버에서 검증한 digest로 고정해 동일한 이미지를 재현한다.
-`postgres_password`는 충분히 긴 무작위 값으로 서버에서 생성하며 권한을 `0600`으로
-설정한다.
+## 전환 순서
 
-## 단계별 적용
-
-1. Compose 구성을 `docker compose config`로 검증한다.
-2. PostgreSQL 18 이미지를 받아 이미지 ID와 RepoDigest를 기록한다.
-3. 데이터베이스만 기동하고 healthcheck가 `healthy`인지 확인한다.
-4. 시험 테이블 1건을 만들고 즉시 백업한다.
-5. 백업을 임시 데이터베이스에 복원하고 시험 데이터가 있는지 확인한다.
-6. 원본 시험 테이블과 임시 복원 데이터베이스를 삭제한다.
-7. 수동 백업 성공 후에만 systemd timer를 활성화한다.
+1. MariaDB 이미지 digest를 확인해 `.env`의 `MARIADB_IMAGE`에 고정한다.
+2. Compose 설정 검증 후 MariaDB만 기동하고 healthcheck를 확인한다.
+3. `prisma migrate deploy`로 빈 MariaDB에 기준 스키마를 적용한다.
+4. 운영 PostgreSQL 백업을 만들고 별도 복원 시험을 수행한다.
+5. `SOURCE_DATABASE_URL`과 MariaDB `DATABASE_URL`을 일회성 파일에 넣어
+   `npm run db:migrate-data:mariadb`를 실행한다.
+6. 스크립트가 모든 테이블의 건수와 SHA-256 검증을 통과했는지 확인한다.
+7. 앱을 잠시 쓰기 중지하고 최종 복제를 다시 수행한 뒤 HR 앱만 MariaDB로 전환한다.
+8. 직원 로그인, 출퇴근, 휴가, 출장, 명부 관리 회귀 시험 후 백업 timer를 활성화한다.
 
 ## 롤백
 
-이 단계에서는 HR 앱이 Neon을 계속 사용하므로 DB 컨테이너를 중지해도 운영 서비스에
-영향이 없다. 문제가 발생하면 timer를 비활성화하고 Compose 프로젝트를 중지한다.
-영구 볼륨은 복원 검증이 끝날 때까지 삭제하지 않는다.
+기존 PostgreSQL은 삭제하거나 수정하지 않는다. 전환 실패 시 앱의 `DATABASE_URL`을
+이전 값으로 되돌려 재배포한다. MariaDB 볼륨과 백업은 원인 확인이 끝날 때까지
+삭제하지 않는다.

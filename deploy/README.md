@@ -6,15 +6,15 @@ BNOW HR은 Ubuntu 운영 서버에서 Docker Compose로 실행하고, 호스트 
 ## 운영 구성
 
 - 앱: Next.js standalone 컨테이너
-- DB: 기존 Neon PostgreSQL 유지
+- DB: HR 전용 MariaDB 11.4 컨테이너
 - 외부 공개: Nginx 80/443만 사용
 - 내부 앱 포트: `127.0.0.1:3010`
 - 인증: 자체 Keycloak의 `hr-server` confidential OIDC client
 - 환경변수: 서버의 `/opt/bnow/checkinout/.env.production.local`에만 저장
 
-Neon에서 자체 PostgreSQL로 이전하는 격리 구성과 백업 절차는
-[`database/README.md`](./database/README.md)를 따른다. 자체 DB의 복원 시험과
-데이터 검증이 끝날 때까지 운영 앱의 `DATABASE_URL`은 변경하지 않는다.
+기존 PostgreSQL에서 자체 MariaDB로 이전하는 격리 구성과 백업 절차는
+[`database/README.md`](./database/README.md)를 따른다. MariaDB 복원 시험과
+데이터 검증이 끝난 뒤에만 운영 앱의 `DATABASE_URL`을 변경한다.
 
 ## 배포
 

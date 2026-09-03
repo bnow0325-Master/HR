@@ -134,13 +134,12 @@ export async function POST(req: Request) {
     where: {
       OR: [
         { code },
-        ...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : []),
+        ...(email ? [{ email: { equals: email } }] : []),
         ...(personalEmail
           ? [
               {
                 personalEmail: {
                   equals: personalEmail,
-                  mode: "insensitive" as const,
                 },
               },
             ]

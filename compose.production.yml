@@ -8,6 +8,9 @@ services:
     env_file:
       - path: .env.production.local
     restart: "no"
+    networks:
+      - default
+      - hr-database
 
   app:
     build:
@@ -22,3 +25,23 @@ services:
       - "127.0.0.1:3010:3000"
     restart: unless-stopped
     init: true
+    networks:
+      - default
+      - hr-database
+
+  data-migrate:
+    profiles: ["data-migration"]
+    build:
+      context: .
+      target: data-migrate
+    env_file:
+      - path: .env.migration.local
+    restart: "no"
+    networks:
+      - default
+      - hr-database
+
+networks:
+  hr-database:
+    external: true
+    name: bnow-hr-database

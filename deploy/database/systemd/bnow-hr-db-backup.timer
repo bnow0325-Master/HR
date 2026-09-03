@@ -1,5 +1,5 @@
 [Unit]
-Description=Run BNOW HR PostgreSQL backup every day
+Description=Run BNOW HR MariaDB backup every day
 
 [Timer]
 OnCalendar=*-*-* 03:10:00 Asia/Seoul

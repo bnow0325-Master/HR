@@ -1,16 +1,18 @@
 [Unit]
-Description=BNOW HR PostgreSQL backup
+Description=BNOW HR MariaDB backup and restore verification
 Requires=docker.service
 After=docker.service
-ConditionPathExists=/opt/bnow/hr-database/.env
-ConditionPathExists=/opt/bnow/hr-database/compose.yml
+ConditionPathExists=/opt/bnow/hr-mariadb/.env
+ConditionPathExists=/opt/bnow/hr-mariadb/compose.yml
 
 [Service]
 Type=oneshot
 User=root
 Group=root
 UMask=0077
-ExecStart=/opt/bnow/hr-database/bin/backup.sh
+Environment=BNOW_HR_DB_DIR=/opt/bnow/hr-mariadb
+ExecStart=/opt/bnow/hr-mariadb/bin/backup.sh
+ExecStartPost=/opt/bnow/hr-mariadb/bin/restore-smoke-test.sh
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
@@ -18,7 +20,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=/opt/bnow/hr-database/backups
+ReadWritePaths=/opt/bnow/hr-mariadb/backups
 
 [Install]
 WantedBy=multi-user.target

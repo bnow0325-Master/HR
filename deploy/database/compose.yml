@@ -1,28 +1,28 @@
 name: bnow-hr-database
 
 services:
-  postgres:
-    image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE is required}
-    container_name: bnow-hr-postgres
+  mariadb:
+    image: ${MARIADB_IMAGE:?MARIADB_IMAGE is required}
+    container_name: bnow-hr-mariadb
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      PGDATA: /var/lib/postgresql/18/docker
+      MARIADB_DATABASE: ${MARIADB_DATABASE:?MARIADB_DATABASE is required}
+      MARIADB_USER: ${MARIADB_USER:?MARIADB_USER is required}
+      MARIADB_PASSWORD_FILE: /run/secrets/mariadb_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/mariadb_root_password
     secrets:
-      - postgres_password
+      - mariadb_password
+      - mariadb_root_password
     volumes:
-      - postgres_data:/var/lib/postgresql/18/docker
+      - mariadb_data:/var/lib/mysql
     networks:
       - database
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 30s
-    shm_size: 256mb
     stop_grace_period: 60s
     security_opt:
       - no-new-privileges:true
@@ -38,9 +38,11 @@ networks:
     internal: true
 
 volumes:
-  postgres_data:
-    name: bnow_hr_postgres_data
+  mariadb_data:
+    name: bnow_hr_mariadb_data
 
 secrets:
-  postgres_password:
-    file: ./secrets/postgres_password
+  mariadb_password:
+    file: ./secrets/mariadb_password
+  mariadb_root_password:
+    file: ./secrets/mariadb_root_password

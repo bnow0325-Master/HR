@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const identity = await exchangeCompanyCode(flow, code);
     const employee = await prisma.employee.findFirst({
       where: {
-        email: { equals: identity.email, mode: "insensitive" },
+        email: { equals: identity.email },
         active: true,
       },
       select: { id: true, email: true },

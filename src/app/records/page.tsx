@@ -20,8 +20,6 @@ type RecordRow = {
   day: number;
   checkIn: string | null;
   checkOut: string | null;
-  checkInAddress: string;
-  checkOutAddress: string;
   workTime: string;
   open: boolean;
 };
@@ -44,7 +42,6 @@ type RecordsResponse = {
 type DevelopmentRecord = {
   type: "IN" | "OUT";
   timestamp: string;
-  address: string;
   cancelledAt?: string | null;
 };
 
@@ -172,8 +169,6 @@ function buildDevelopmentRecords(
         day: Number(date.slice(-2)),
         checkIn: checkInDate ? formatTime(checkInDate) : null,
         checkOut: checkOutDate ? formatTime(checkOutDate) : null,
-        checkInAddress: checkIn?.address || "-",
-        checkOutAddress: checkOut?.address || "-",
         workTime: formatDuration(workMilliseconds),
         open: Boolean(checkIn && !checkOut),
       };
@@ -307,7 +302,7 @@ function RecordsPageContent() {
         <div>
           <h1 className="text-2xl font-bold">출퇴근 기록부</h1>
           <p className="text-sm text-slate-500">
-            로그인한 사용자의 월간 출퇴근 시간과 접속 위치를 확인합니다.
+            로그인한 사용자의 월간 출퇴근 시간과 근무시간을 확인합니다.
           </p>
         </div>
         <Link href="/" className="text-sm text-slate-400 hover:text-slate-600">
@@ -395,14 +390,12 @@ function RecordsPageContent() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[760px] text-sm">
+                  <table className="w-full min-w-[560px] text-sm">
                     <thead className="bg-white text-left text-slate-500">
                       <tr>
                         <th className="px-4 py-3 font-medium">일자</th>
                         <th className="px-4 py-3 font-medium">출근</th>
                         <th className="px-4 py-3 font-medium">퇴근</th>
-                        <th className="px-4 py-3 font-medium">출근 위치</th>
-                        <th className="px-4 py-3 font-medium">퇴근 위치</th>
                         <th className="px-4 py-3 font-medium">근무시간</th>
                         <th className="px-4 py-3 font-medium">상태</th>
                       </tr>
@@ -421,12 +414,6 @@ function RecordsPageContent() {
                           </td>
                           <td className="px-4 py-3 font-mono text-slate-700">
                             {row.checkOut ?? "-"}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-600">
-                            {row.checkInAddress}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-600">
-                            {row.checkOutAddress}
                           </td>
                           <td className="px-4 py-3 font-semibold text-slate-800">
                             {row.workTime}

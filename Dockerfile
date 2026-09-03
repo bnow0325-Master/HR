@@ -16,6 +16,11 @@ RUN mkdir -p public && npm run build
 FROM dependencies AS migrate
 CMD ["npx", "prisma", "migrate", "deploy"]
 
+FROM dependencies AS data-migrate
+COPY scripts ./scripts
+COPY src/lib/mariaDbConfig.ts ./src/lib/mariaDbConfig.ts
+CMD ["npm", "run", "db:migrate-data:mariadb"]
+
 FROM node:22-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl \

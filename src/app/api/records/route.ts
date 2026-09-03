@@ -18,9 +18,6 @@ type EmployeeLite = {
 type RecordLite = {
   type: string;
   timestamp: Date;
-  latitude: number | null;
-  longitude: number | null;
-  note: string | null;
 };
 
 function parseMonth(month: string | undefined) {
@@ -97,12 +94,6 @@ function summarizeDay(records: RecordLite[]) {
   return {
     firstIn: firstRecord?.timestamp ?? null,
     lastOut: lastRecord?.timestamp ?? null,
-    firstInAddress: firstRecord?.note ?? null,
-    lastOutAddress: lastRecord?.note ?? null,
-    firstInLatitude: firstRecord?.latitude ?? null,
-    firstInLongitude: firstRecord?.longitude ?? null,
-    lastOutLatitude: lastRecord?.latitude ?? null,
-    lastOutLongitude: lastRecord?.longitude ?? null,
     totalMinutes,
     open: sorted.length === 1,
   };
@@ -162,9 +153,6 @@ export async function POST(req: Request) {
       employeeId: true,
       type: true,
       timestamp: true,
-      latitude: true,
-      longitude: true,
-      note: true,
     },
     orderBy: [{ employeeId: "asc" }, { timestamp: "asc" }],
   });
@@ -195,12 +183,6 @@ export async function POST(req: Request) {
       day,
       checkIn: kstTime(summary.firstIn),
       checkOut: kstTime(summary.lastOut),
-      checkInAddress: summary.firstInAddress ?? "-",
-      checkOutAddress: summary.lastOutAddress ?? "-",
-      checkInLatitude: summary.firstInLatitude,
-      checkInLongitude: summary.firstInLongitude,
-      checkOutLatitude: summary.lastOutLatitude,
-      checkOutLongitude: summary.lastOutLongitude,
       workMinutes: summary.totalMinutes,
       workTime: summary.totalMinutes ? formatMinutes(summary.totalMinutes) : "-",
       open: summary.open,
