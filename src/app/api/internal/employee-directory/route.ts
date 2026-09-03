@@ -3,43 +3,13 @@ import {
   employeeDirectoryApiConfigured,
   isEmployeeDirectoryRequestAuthorized,
 } from "@/lib/internalApiAuth";
+import {
+  employeeDirectorySelect,
+  presentEmployeeDirectoryRecord,
+} from "@/lib/employeeDirectory";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
-
-type ColumnRow = { column_name: string };
-
-type BasicEmployeeRow = {
-  id: string;
-  code: string;
-  name: string;
-  department: string | null;
-  active: boolean;
-};
-
-type ContractEmployeeRow = BasicEmployeeRow & {
-  position: string | null;
-  email: string | null;
-  phone: string | null;
-  hireDate: Date | string | null;
-  terminationDate: Date | string | null;
-  systemRole: string;
-  attendanceEnabled: boolean;
-  leaveEnabled: boolean;
-  workboardEnabled: boolean;
-};
-
-const CONTRACT_DIRECTORY_COLUMNS = [
-  "position",
-  "email",
-  "phone",
-  "hireDate",
-  "terminationDate",
-  "systemRole",
-  "attendanceEnabled",
-  "leaveEnabled",
-  "workboardEnabled",
-] as const;
 
 function responseHeaders() {
   return {
@@ -48,91 +18,13 @@ function responseHeaders() {
   };
 }
 
-function dateOnly(value: Date | string | null): string | null {
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-    return value.slice(0, 10);
-  }
-  return null;
-}
-
-async function supportsContractDirectoryFields(): Promise<boolean> {
-  const columns = await prisma.$queryRaw<ColumnRow[]>`
-    SELECT column_name
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'Employee'
-  `;
-  const available = new Set(columns.map((column) => column.column_name));
-  return CONTRACT_DIRECTORY_COLUMNS.every((column) => available.has(column));
-}
-
-async function listContractEmployees(
-  includeInactive: boolean,
-): Promise<ContractEmployeeRow[]> {
-  if (await supportsContractDirectoryFields()) {
-    return includeInactive
-      ? prisma.$queryRaw<ContractEmployeeRow[]>`
-          SELECT
-            "id",
-            "code",
-            "name",
-            "department",
-            "position",
-            "email",
-            "phone",
-            "hireDate",
-            "terminationDate",
-            "systemRole",
-            "attendanceEnabled",
-            "leaveEnabled",
-            "workboardEnabled",
-            "active"
-          FROM "Employee"
-          ORDER BY "code" ASC
-          LIMIT 500
-        `
-      : prisma.$queryRaw<ContractEmployeeRow[]>`
-          SELECT
-            "id",
-            "code",
-            "name",
-            "department",
-            "position",
-            "email",
-            "phone",
-            "hireDate",
-            "terminationDate",
-            "systemRole",
-            "attendanceEnabled",
-            "leaveEnabled",
-            "workboardEnabled",
-            "active"
-          FROM "Employee"
-          WHERE "active" = true
-          ORDER BY "code" ASC
-          LIMIT 500
-        `;
-  }
-
-  const employees = await prisma.employee.findMany({
+async function listContractEmployees(includeInactive: boolean) {
+  return prisma.employee.findMany({
     where: includeInactive ? undefined : { active: true },
-    select: { id: true, code: true, name: true, department: true, active: true },
+    select: employeeDirectorySelect,
     orderBy: { code: "asc" },
     take: 500,
   });
-  return employees.map((employee: BasicEmployeeRow) => ({
-    ...employee,
-    position: null,
-    email: null,
-    phone: null,
-    hireDate: null,
-    terminationDate: null,
-    systemRole: "MEMBER",
-    attendanceEnabled: false,
-    leaveEnabled: false,
-    workboardEnabled: false,
-  }));
 }
 
 export async function GET(request: Request) {
@@ -154,11 +46,7 @@ export async function GET(request: Request) {
   const employees = await listContractEmployees(includeInactive);
   return NextResponse.json(
     {
-      employees: employees.map((employee) => ({
-        ...employee,
-        hireDate: dateOnly(employee.hireDate),
-        terminationDate: dateOnly(employee.terminationDate),
-      })),
+      employees: employees.map(presentEmployeeDirectoryRecord),
     },
     { headers: responseHeaders() },
   );
