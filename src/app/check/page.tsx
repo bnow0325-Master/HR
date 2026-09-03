@@ -22,18 +22,11 @@ type GeoState =
   | { status: "ready"; lat: number; lng: number; accuracy: number | null }
   | { status: "error"; message: string };
 
-type AddressState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "ready"; address: string }
-  | { status: "error"; message: string };
-
 type SubmitResult =
   | {
       ok: true;
       type: "IN" | "OUT";
       time: string;
-      address: string;
     }
   | { ok: false; message: string };
 
@@ -49,7 +42,6 @@ type AttendanceStatus = {
 type DevelopmentAttendanceRecord = {
   type: "IN" | "OUT";
   timestamp: string;
-  address: string;
   cancelledAt?: string | null;
   cancelNote?: string | null;
 };
@@ -81,45 +73,6 @@ function loadDevelopmentEmployees() {
   } catch {
     return [DEVELOPMENT_EMPLOYEE];
   }
-}
-
-function formatDongAddress(raw: string) {
-  const normalized = raw.replaceAll(",", " ").replace(/\s+/g, " ").trim();
-  if (!normalized) return "주소를 확인하지 못했습니다.";
-
-  const parts = normalized
-    .split(" ")
-    .filter(Boolean)
-    .filter(
-      (part) =>
-        !(
-          part.endsWith("특별시") ||
-          part.endsWith("광역시") ||
-          part.endsWith("특별자치시") ||
-          part.endsWith("특별자치도") ||
-          part.endsWith("대한민국")
-        ),
-    );
-
-  const district = parts.find((part) => /(구|군)$/.test(part)) ?? "";
-  const neighborhood =
-    parts
-      .map((part) => {
-        const dongMatch = part.match(/^(.*(?:동|읍|면|리))(?:\d+가)?$/);
-        if (dongMatch) return dongMatch[1];
-
-        const roadMatch = part.match(/^(.*(?:로|길)).*$/);
-        if (roadMatch) return roadMatch[1];
-
-        return "";
-      })
-      .find(Boolean) ?? "";
-
-  if (district && neighborhood) {
-    return `${district} ${neighborhood}`;
-  }
-
-  return neighborhood || district || parts.slice(0, 2).join(" ");
 }
 
 function getCurrentPosition() {
@@ -170,7 +123,6 @@ function CheckPageContent() {
   );
   const [employeeId, setEmployeeId] = useState("");
   const [geo, setGeo] = useState<GeoState>({ status: "idle" });
-  const [address, setAddress] = useState<AddressState>({ status: "idle" });
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [actionMessage, setActionMessage] = useState("");
@@ -227,45 +179,16 @@ function CheckPageContent() {
     window.sessionStorage.setItem("workboardEmployeeId", matched.id);
   }, [employees]);
 
-  async function resolveAddress(lat: number, lng: number) {
-    setAddress({ status: "loading" });
-    try {
-      const params = new URLSearchParams({
-        lat: String(lat),
-        lng: String(lng),
-      });
-      const response = await fetch(`/api/location/address?${params}`, {
-        cache: "no-store",
-      });
-      const data = await response.json();
-      if (!response.ok || !data.address) {
-        setAddress({
-          status: "error",
-          message: data.error ?? "주소를 가져오지 못했습니다.",
-        });
-        return "";
-      }
-
-      setAddress({ status: "ready", address: data.address });
-      return data.address as string;
-    } catch {
-      setAddress({ status: "error", message: "주소를 가져오지 못했습니다." });
-      return "";
-    }
-  }
-
   function requestLocation() {
     if (!("geolocation" in navigator)) {
       setGeo({
         status: "error",
-        message: "이 기기에서는 위치 정보를 사용할 수 없습니다.",
+        message: "이 기기에서는 출퇴근 등록을 준비할 수 없습니다.",
       });
-      setAddress({ status: "idle" });
       return;
     }
 
     setGeo({ status: "loading" });
-    setAddress({ status: "idle" });
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -275,17 +198,15 @@ function CheckPageContent() {
           lng: position.coords.longitude,
           accuracy: position.coords.accuracy,
         });
-        void resolveAddress(position.coords.latitude, position.coords.longitude);
       },
       (error) => {
         setGeo({
           status: "error",
           message:
             error.code === error.PERMISSION_DENIED
-              ? "위치 권한이 거부되었습니다. 브라우저에서 위치 권한을 허용해 주세요."
-              : "현재 위치를 가져오지 못했습니다.",
+              ? "브라우저 권한이 거부되어 출퇴근을 등록할 수 없습니다."
+              : "출퇴근 등록을 준비하지 못했습니다.",
         });
-        setAddress({ status: "idle" });
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
@@ -417,20 +338,16 @@ function CheckPageContent() {
     try {
       let latitude = 0;
       let longitude = 0;
-      let currentAddress = "";
 
       if (geo.status === "ready") {
         latitude = geo.lat;
         longitude = geo.lng;
-        currentAddress = address.status === "ready" ? address.address : "";
       } else {
         if (!("geolocation" in navigator)) {
-          if (isDevelopment) {
-            currentAddress = "위치 확인 불가";
-          } else {
+          if (!isDevelopment) {
             setResult({
               ok: false,
-              message: "이 기기에서는 위치 정보를 사용할 수 없습니다.",
+              message: "이 기기에서는 출퇴근을 등록할 수 없습니다.",
             });
             return;
           }
@@ -448,8 +365,6 @@ function CheckPageContent() {
               lng: longitude,
               accuracy: position.coords.accuracy,
             });
-
-            currentAddress = await resolveAddress(latitude, longitude);
           } catch {
             if (!isDevelopment) {
               throw new Error("location-unavailable");
@@ -457,13 +372,8 @@ function CheckPageContent() {
             setGeo({
               status: "error",
               message:
-                "로컬 개발 환경에서 위치를 확인하지 못했지만 출퇴근 기록은 사용할 수 있습니다.",
+                "로컬 개발 환경에서는 브라우저 권한 없이 출퇴근 기록을 시험할 수 있습니다.",
             });
-            setAddress({
-              status: "error",
-              message: "위치 확인 불가",
-            });
-            currentAddress = "위치 확인 불가";
           }
         }
       }
@@ -516,7 +426,6 @@ function CheckPageContent() {
         storedRecords.push({
           type,
           timestamp: timestamp.toISOString(),
-          address: currentAddress,
         });
         window.localStorage.setItem(
           DEVELOPMENT_RECORDS_KEY,
@@ -530,11 +439,6 @@ function CheckPageContent() {
             minute: "2-digit",
             second: "2-digit",
           }),
-          address: currentAddress
-            ? currentAddress === "위치 확인 불가"
-              ? currentAddress
-              : formatDongAddress(currentAddress)
-            : "주소를 확인하지 못했습니다.",
         });
         setAttendanceStatus({
           loading: false,
@@ -560,7 +464,6 @@ function CheckPageContent() {
           type,
           latitude,
           longitude,
-          address: currentAddress,
         }),
       });
       const data = await response.json();
@@ -576,10 +479,6 @@ function CheckPageContent() {
             minute: "2-digit",
             second: "2-digit",
           }),
-          address:
-            typeof data.record.address === "string" && data.record.address
-              ? formatDongAddress(data.record.address)
-              : "주소를 확인하지 못했습니다.",
         });
         setAttendanceStatus({
           loading: false,
@@ -604,7 +503,7 @@ function CheckPageContent() {
     } catch {
       setResult({
         ok: false,
-        message: "현재 위치를 확인하거나 출퇴근을 기록하지 못했습니다.",
+        message: "출퇴근을 기록하지 못했습니다. 잠시 후 다시 시도해 주세요.",
       });
     } finally {
       setSubmitting(false);
@@ -838,10 +737,6 @@ function CheckPageContent() {
             </div>
             <div className="mt-1 text-sm font-semibold text-slate-500">
               {result.type === "IN" ? "출근시간" : "퇴근시간"}
-            </div>
-            <div className="mt-4 rounded-lg bg-white/80 px-4 py-3 text-left text-sm text-slate-700">
-              <div className="font-semibold text-slate-800">현재 접속위치</div>
-              <div className="mt-1">{result.address}</div>
             </div>
           </div>
         ) : (

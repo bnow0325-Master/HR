@@ -9,7 +9,6 @@ type CheckBody = {
   type?: "IN" | "OUT";
   latitude?: number;
   longitude?: number;
-  address?: string;
 };
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -49,7 +48,6 @@ export async function POST(req: Request) {
   }
 
   const { action, type, latitude, longitude } = body;
-  const address = body.address?.trim() || null;
 
   const authenticatedEmployee =
     await getCurrentWorkboardEmployee("attendance");
@@ -131,8 +129,7 @@ export async function POST(req: Request) {
   if (typeof latitude !== "number" || typeof longitude !== "number") {
     return NextResponse.json(
       {
-        error:
-          "위치 정보가 필요합니다. 브라우저에서 위치 권한을 허용해 주세요.",
+        error: "출퇴근 등록 준비가 완료되지 않았습니다. 브라우저 권한을 확인해 주세요.",
       },
       { status: 422 },
     );
@@ -142,7 +139,7 @@ export async function POST(req: Request) {
   if (!geo.ok) {
     return NextResponse.json(
       {
-        error: `사무실에서 ${geo.distance}m 떨어져 있습니다. 사무실 안에서만 출퇴근할 수 있습니다.`,
+        error: "현재 출퇴근을 등록할 수 없습니다. 관리자에게 문의해 주세요.",
       },
       { status: 403 },
     );
@@ -194,7 +191,6 @@ export async function POST(req: Request) {
       verified: true,
       latitude,
       longitude,
-      note: address,
     },
   });
 
@@ -204,9 +200,6 @@ export async function POST(req: Request) {
       id: record.id,
       type: record.type,
       timestamp: record.timestamp,
-      latitude: record.latitude,
-      longitude: record.longitude,
-      address: record.note,
     },
     cancelExpiresAt:
       record.type === "OUT" ? checkoutCancelExpiresAt(record.timestamp) : null,
@@ -248,10 +241,11 @@ export async function GET(req: Request) {
 
       const records = await prisma.attendanceRecord.findMany({
         where,
-        include: {
-          employee: {
-            select: { name: true, code: true, department: true },
-          },
+        select: {
+          id: true,
+          type: true,
+          timestamp: true,
+          cancelledAt: true,
         },
         orderBy: { timestamp: "desc" },
         take: 200,
@@ -266,6 +260,11 @@ export async function GET(req: Request) {
             employeeId: authenticatedEmployeeId,
             cancelledAt: null,
             timestamp: { gte: todayRange.start, lt: todayRange.end },
+          },
+          select: {
+            id: true,
+            type: true,
+            timestamp: true,
           },
           orderBy: { timestamp: "asc" },
         })
