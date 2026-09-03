@@ -69,4 +69,8 @@ if [[ "${table_count}" != "5" ]]; then
   exit 1
 fi
 
+marker_path="${BACKUP_DIR}/.last-restore-verified"
+printf '%s\n' "$(basename "${backup_path}")" >"${marker_path}.tmp"
+mv "${marker_path}.tmp" "${marker_path}"
+chmod 0600 "${marker_path}"
 echo "Restore smoke test completed: ${restore_db}"

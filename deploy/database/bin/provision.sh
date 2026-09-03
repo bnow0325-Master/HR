@@ -47,17 +47,35 @@ docker compose \
   --env-file "${ENV_FILE}" \
   -f "${BASE_DIR}/compose.yml" up -d mariadb
 
+healthy=0
 for _ in $(seq 1 36); do
   if docker compose \
     --project-directory "${BASE_DIR}" \
     --env-file "${ENV_FILE}" \
     -f "${BASE_DIR}/compose.yml" exec -T mariadb \
     healthcheck.sh --connect --innodb_initialized >/dev/null 2>&1; then
-    echo "HR MariaDB is healthy (${image_digest})."
-    exit 0
+    healthy=1
+    break
   fi
   sleep 5
 done
 
-echo "HR MariaDB did not become healthy." >&2
-exit 1
+if [[ "${healthy}" != "1" ]]; then
+  echo "HR MariaDB did not become healthy." >&2
+  exit 1
+fi
+
+install -m 0644 \
+  "${BASE_DIR}/systemd/bnow-hr-db-backup.service" \
+  /etc/systemd/system/bnow-hr-db-backup.service
+install -m 0644 \
+  "${BASE_DIR}/systemd/bnow-hr-db-backup.timer" \
+  /etc/systemd/system/bnow-hr-db-backup.timer
+systemctl daemon-reload
+
+if [[ -s "${BASE_DIR}/backups/.last-restore-verified" ]]; then
+  systemctl enable --now bnow-hr-db-backup.timer
+  echo "HR MariaDB is healthy and the verified backup timer is enabled (${image_digest})."
+else
+  echo "HR MariaDB is healthy; backup timer remains disabled until restore verification succeeds (${image_digest})."
+fi
