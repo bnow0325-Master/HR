@@ -18,6 +18,8 @@
 2. PR을 `main`에 병합한다.
 3. Git 추적 파일만 서버 `/opt/bnow/checkinout`에 반영한다.
 4. 서버의 `.env.production.local`이 보존됐고 사내 통합 인증 환경변수가 있는지 확인한다.
+   휴가·출장 결재 알림을 사용하려면 `WORKBOARD_STAFF_CHAT_WEBHOOK_URL`,
+   `WORKBOARD_STAFF_CHAT_WEBHOOK_TOKEN`, `HR_PUBLIC_ORIGIN`도 확인한다.
 5. `docker compose -f compose.production.yml up -d --build`를 실행한다.
 6. 컨테이너 헬스와 DB 마이그레이션을 확인한다.
 7. HTTPS 주요 화면과 API를 검증한다.

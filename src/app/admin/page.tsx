@@ -141,10 +141,19 @@ function leaveStatus(status: string) {
   if (status === "CANCELLED") {
     return { label: "취소", tone: "bg-slate-100 text-slate-500" };
   }
+  if (status === "REJECTED") {
+    return { label: "반려", tone: "bg-rose-50 text-rose-700" };
+  }
   return { label: "신청 중", tone: "bg-blue-50 text-blue-700" };
 }
 
 function tripStatus(status: string, startDate: Date, endDate: Date, today: Date) {
+  if (status === "PENDING") {
+    return { label: "승인 대기", tone: "bg-amber-50 text-amber-700" };
+  }
+  if (status === "REJECTED") {
+    return { label: "반려", tone: "bg-rose-50 text-rose-700" };
+  }
   if (status === "CANCELLED") {
     return { label: "취소", tone: "bg-slate-100 text-slate-500" };
   }
@@ -303,7 +312,7 @@ export default async function AdminPage({
     const registeredTrips = businessTrips
       .filter(
         (trip) =>
-          trip.employeeId === employee.id && trip.status === "REGISTERED",
+          trip.employeeId === employee.id && trip.status === "APPROVED",
       )
       .sort((left, right) => left.startDate.getTime() - right.startDate.getTime());
     const currentTrip = registeredTrips.find(
@@ -354,9 +363,12 @@ export default async function AdminPage({
   const pendingLeaveCount = leaveRequests.filter(
     (request) => request.status === "PENDING",
   ).length;
+  const pendingTripCount = businessTrips.filter(
+    (trip) => trip.status === "PENDING",
+  ).length;
   const activeTripCount = businessTrips.filter(
     (trip) =>
-      trip.status === "REGISTERED" &&
+      trip.status === "APPROVED" &&
       trip.startDate <= today &&
       trip.endDate >= today,
   ).length;
@@ -376,6 +388,12 @@ export default async function AdminPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Link
+            href="/admin/approvals"
+            className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 font-semibold text-amber-800 hover:bg-amber-100"
+          >
+            결재 요청 {pendingLeaveCount + pendingTripCount}건
+          </Link>
           <Link
             href="/admin/authorization-letters"
             className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 font-semibold text-rose-700 hover:bg-rose-100"
@@ -398,11 +416,12 @@ export default async function AdminPage({
         </div>
       </header>
 
-      <section className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <section className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-6">
         <SummaryCard label="재직 직원" value={`${activeEmployees.length}명`} />
         <SummaryCard label="오늘 출근" value={`${checkedInCount}명`} />
         <SummaryCard label="현재 근무 중" value={`${workingCount}명`} accent="green" />
         <SummaryCard label="휴가 신청 중" value={`${pendingLeaveCount}건`} accent="blue" />
+        <SummaryCard label="출장 신청 중" value={`${pendingTripCount}건`} />
         <SummaryCard label="오늘 출장" value={`${activeTripCount}명`} />
       </section>
 

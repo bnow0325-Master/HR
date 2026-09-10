@@ -18,7 +18,7 @@ type BusinessTrip = {
   startDate: string;
   endDate: string;
   reason: string;
-  status: "REGISTERED" | "CANCELLED";
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
   createdAt: string;
 };
 
@@ -67,6 +67,12 @@ function tripDays(trip: BusinessTrip) {
 }
 
 function tripState(trip: BusinessTrip) {
+  if (trip.status === "PENDING") {
+    return { label: "승인 대기", tone: "bg-amber-50 text-amber-700" };
+  }
+  if (trip.status === "REJECTED") {
+    return { label: "반려", tone: "bg-rose-50 text-rose-700" };
+  }
   if (trip.status === "CANCELLED") {
     return { label: "취소", tone: "bg-slate-100 text-slate-500" };
   }
@@ -186,7 +192,7 @@ export default function BusinessTripsPage() {
 
     const overlaps = trips.some(
       (trip) =>
-        trip.status === "REGISTERED" &&
+        ["PENDING", "APPROVED"].includes(trip.status) &&
         dateKey(trip.startDate) <= endDate &&
         dateKey(trip.endDate) >= startDate,
     );
@@ -207,7 +213,7 @@ export default function BusinessTripsPage() {
         startDate: parseDateOnly(startDate).toISOString(),
         endDate: parseDateOnly(endDate).toISOString(),
         reason: reason.trim(),
-        status: "REGISTERED",
+        status: "PENDING",
         createdAt: new Date().toISOString(),
       };
       const allTrips = [nextTrip, ...readDevelopmentTrips()];
@@ -218,7 +224,7 @@ export default function BusinessTripsPage() {
       setReason("");
       setSubmitting(false);
       await load();
-      setMessage({ ok: true, text: "출장일지를 등록했습니다." });
+      setMessage({ ok: true, text: "출장 신청을 접수했습니다. 관리자 승인 후 확정됩니다." });
       return;
     }
 
@@ -242,7 +248,7 @@ export default function BusinessTripsPage() {
       }
       setReason("");
       await load();
-      setMessage({ ok: true, text: "출장일지를 등록했습니다." });
+      setMessage({ ok: true, text: "출장 신청을 접수했습니다. 관리자 승인 후 확정됩니다." });
     } catch {
       setMessage({ ok: false, text: "출장일지 등록에 실패했습니다." });
     } finally {
@@ -250,13 +256,13 @@ export default function BusinessTripsPage() {
     }
   }
 
-  const registeredTrips = trips.filter(
-    (trip) => trip.status === "REGISTERED",
+  const approvedTrips = trips.filter(
+    (trip) => trip.status === "APPROVED",
   );
-  const upcomingCount = registeredTrips.filter(
+  const upcomingCount = approvedTrips.filter(
     (trip) => today < dateKey(trip.startDate),
   ).length;
-  const activeCount = registeredTrips.filter(
+  const activeCount = approvedTrips.filter(
     (trip) =>
       dateKey(trip.startDate) <= today && today <= dateKey(trip.endDate),
   ).length;
@@ -294,7 +300,7 @@ export default function BusinessTripsPage() {
             </div>
           </div>
           <div className="text-right text-sm text-slate-500">
-            등록된 출장 {registeredTrips.length}건
+            확정된 출장 {approvedTrips.length}건
           </div>
         </section>
       )}
@@ -306,7 +312,7 @@ export default function BusinessTripsPage() {
       ) : employee ? (
         <>
           <section className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <TripSummaryCard label="전체 출장" value={registeredTrips.length} />
+            <TripSummaryCard label="확정 출장" value={approvedTrips.length} />
             <TripSummaryCard label="예정" value={upcomingCount} />
             <TripSummaryCard label="출장 중" value={activeCount} accent />
           </section>
