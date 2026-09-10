@@ -412,6 +412,12 @@ export default async function AdminPage({
           >
             직원명부 관리
           </Link>
+          <Link
+            href="/admin/naverworks-import"
+            className="rounded-full border border-violet-200 bg-violet-50 px-4 py-2 font-semibold text-violet-700 hover:bg-violet-100"
+          >
+            네이버웍스 원장
+          </Link>
           <LogoutButton />
         </div>
       </header>
