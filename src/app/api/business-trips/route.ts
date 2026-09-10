@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { startOfKstDate } from "@/lib/annualLeave";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
+import { notifyAdminsAboutApprovalRequest } from "@/lib/workboardApprovalNotifications";
 
 type BusinessTripBody = {
   startDate?: string;
@@ -122,7 +123,7 @@ export async function POST(req: Request) {
   const overlap = await prisma.businessTrip.findFirst({
     where: {
       employeeId,
-      status: "REGISTERED",
+      status: { in: ["PENDING", "APPROVED"] },
       startDate: { lte: endDate },
       endDate: { gte: startDate },
     },
@@ -144,6 +145,20 @@ export async function POST(req: Request) {
     },
     select: businessTripSelect,
   });
+
+  const employeeDetails = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { name: true, code: true },
+  });
+  if (employeeDetails) {
+    await notifyAdminsAboutApprovalRequest({
+      kind: "business-trip",
+      requestId: trip.id,
+      employeeName: employeeDetails.name,
+      employeeCode: employeeDetails.code,
+      description: `${startDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ~ ${endDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} 출장`,
+    });
+  }
 
   return NextResponse.json({ ok: true, trip }, { status: 201 });
 }

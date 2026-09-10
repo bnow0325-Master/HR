@@ -7,6 +7,7 @@ import {
   statutoryAnnualLeaveDays,
 } from "@/lib/annualLeave";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
+import { notifyAdminsAboutApprovalRequest } from "@/lib/workboardApprovalNotifications";
 
 type LeaveBody = {
   leaveType?: "ANNUAL" | "AM_HALF" | "PM_HALF";
@@ -205,6 +206,15 @@ export async function POST(req: Request) {
       reason: body.reason?.trim() || null,
     },
     select: leaveRequestSelect,
+  });
+
+  // The request remains valid even if chat delivery is temporarily unavailable.
+  await notifyAdminsAboutApprovalRequest({
+    kind: "leave",
+    requestId: request.id,
+    employeeName: current.employee.name,
+    employeeCode: current.employee.code,
+    description: `${leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveType === "ANNUAL" ? "연차" : leaveType === "AM_HALF" ? "오전 반차" : "오후 반차"}`,
   });
 
   return NextResponse.json({ ok: true, request }, { status: 201 });

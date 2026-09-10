@@ -27,7 +27,7 @@ type LeaveRequest = {
   leaveDate: string;
   unitsMinutes: number;
   reason: string | null;
-  status: "PENDING" | "APPROVED" | "CHANGE_REQUESTED" | "CANCELLED";
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CHANGE_REQUESTED" | "CANCELLED";
   createdAt: string;
 };
 
@@ -77,6 +77,7 @@ function leaveTypeLabel(type: LeaveRequest["leaveType"]) {
 
 function statusLabel(status: LeaveRequest["status"]) {
   if (status === "APPROVED") return "확정";
+  if (status === "REJECTED") return "반려";
   if (status === "CHANGE_REQUESTED") return "시기변경 요청";
   if (status === "CANCELLED") return "취소";
   return "신청 중";
@@ -279,7 +280,7 @@ export default function LeavePage() {
       setLeaveDate("");
       setReason("");
       await load();
-      setMessage({ ok: true, text: "휴가 신청을 등록했습니다." });
+      setMessage({ ok: true, text: "휴가 신청을 접수했습니다. 관리자 승인 후 확정됩니다." });
       return;
     }
 
@@ -304,7 +305,7 @@ export default function LeavePage() {
     setLeaveDate("");
     setReason("");
     await load();
-    setMessage({ ok: true, text: "휴가 신청을 등록했습니다." });
+    setMessage({ ok: true, text: "휴가 신청을 접수했습니다. 관리자 승인 후 확정됩니다." });
   }
 
   return (
