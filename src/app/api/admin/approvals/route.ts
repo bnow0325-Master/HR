@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
+import { notifyEmployeeAboutApprovalDecision } from "@/lib/workboardApprovalNotifications";
 
 type ApprovalBody = {
   kind?: "leave" | "business-trip";
@@ -69,14 +70,26 @@ export async function PATCH(req: Request) {
   }
 
   const reviewerNote = body.reviewerNote?.trim().slice(0, 1000) || null;
+  const decision: "APPROVED" | "REJECTED" =
+    body.action === "APPROVE" ? "APPROVED" : "REJECTED";
   const reviewData = {
-    status: body.action === "APPROVE" ? "APPROVED" : "REJECTED",
+    status: decision,
     reviewerNote,
     reviewedAt: new Date(),
     reviewedByEmail: admin.email,
   };
 
   if (body.kind === "leave") {
+    const request = await prisma.leaveRequest.findFirst({
+      where: { id: body.requestId, status: "PENDING" },
+      include: { employee: { select: { name: true, code: true, email: true } } },
+    });
+    if (!request) {
+      return NextResponse.json(
+        { error: "이미 처리되었거나 찾을 수 없는 휴가 신청입니다." },
+        { status: 409 },
+      );
+    }
     const updated = await prisma.leaveRequest.updateMany({
       where: { id: body.requestId, status: "PENDING" },
       data: reviewData,
@@ -87,10 +100,23 @@ export async function PATCH(req: Request) {
         { status: 409 },
       );
     }
+    const leaveLabel = request.leaveType === "ANNUAL"
+      ? "연차"
+      : request.leaveType === "AM_HALF" ? "오전 반차" : "오후 반차";
+    await notifyEmployeeAboutApprovalDecision({
+      kind: "leave",
+      requestId: request.id,
+      employeeName: request.employee.name,
+      employeeCode: request.employee.code,
+      employeeEmail: request.employee.email,
+      description: `${request.leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveLabel}`,
+      decision,
+      reviewerNote,
+    });
   } else {
     const trip = await prisma.businessTrip.findFirst({
       where: { id: body.requestId, status: "PENDING" },
-      select: { employeeId: true, startDate: true, endDate: true },
+      include: { employee: { select: { name: true, code: true, email: true } } },
     });
     if (!trip) {
       return NextResponse.json(
@@ -125,6 +151,16 @@ export async function PATCH(req: Request) {
         { status: 409 },
       );
     }
+    await notifyEmployeeAboutApprovalDecision({
+      kind: "business-trip",
+      requestId: body.requestId,
+      employeeName: trip.employee.name,
+      employeeCode: trip.employee.code,
+      employeeEmail: trip.employee.email,
+      description: `${trip.startDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ~ ${trip.endDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })}`,
+      decision,
+      reviewerNote,
+    });
   }
 
   return NextResponse.json({ ok: true });
