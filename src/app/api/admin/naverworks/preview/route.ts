@@ -14,7 +14,8 @@ export async function POST(request: Request) {
   let rows;
   try { rows = parseNaverWorksCommuteWorkbook(Buffer.from(await file.arrayBuffer())); }
   catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "엑셀 파일을 읽지 못했습니다." }, { status: 400 }); }
-  const employees = await prisma.employee.findMany({ where: { active: true }, select: { id: true, name: true, externalLoginId: true } });
+  // Historical NAVER WORKS records must also remain attached to resigned employees.
+  const employees = await prisma.employee.findMany({ select: { id: true, name: true, externalLoginId: true } });
   const byLogin = new Map(employees.filter((item) => item.externalLoginId).map((item) => [item.externalLoginId!.toLowerCase(), item]));
   const nameCounts = new Map<string, number>();
   employees.forEach((item) => nameCounts.set(item.name, (nameCounts.get(item.name) ?? 0) + 1));
