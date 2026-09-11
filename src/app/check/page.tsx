@@ -179,45 +179,6 @@ function CheckPageContent() {
     window.sessionStorage.setItem("workboardEmployeeId", matched.id);
   }, [employees]);
 
-  function requestLocation() {
-    if (!("geolocation" in navigator)) {
-      setGeo({
-        status: "error",
-        message: "이 기기에서는 출퇴근 등록을 준비할 수 없습니다.",
-      });
-      return;
-    }
-
-    setGeo({ status: "loading" });
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setGeo({
-          status: "ready",
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-        });
-      },
-      (error) => {
-        setGeo({
-          status: "error",
-          message:
-            error.code === error.PERMISSION_DENIED
-              ? "브라우저 권한이 거부되어 출퇴근을 등록할 수 없습니다."
-              : "출퇴근 등록을 준비하지 못했습니다.",
-        });
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
-  }
-
-  useEffect(() => {
-    if (employeeId && geo.status === "idle") {
-      requestLocation();
-    }
-  }, [employeeId, geo.status]);
-
   useEffect(() => {
     if (!employeeId) return;
 
@@ -336,21 +297,15 @@ function CheckPageContent() {
     setSubmitting(true);
 
     try {
-      let latitude = 0;
-      let longitude = 0;
+      let latitude: number | undefined;
+      let longitude: number | undefined;
 
       if (geo.status === "ready") {
         latitude = geo.lat;
         longitude = geo.lng;
       } else {
         if (!("geolocation" in navigator)) {
-          if (!isDevelopment) {
-            setResult({
-              ok: false,
-              message: "이 기기에서는 출퇴근을 등록할 수 없습니다.",
-            });
-            return;
-          }
+          setGeo({ status: "error", message: "" });
         } else {
           try {
             setGeo({ status: "loading" });
@@ -366,13 +321,9 @@ function CheckPageContent() {
               accuracy: position.coords.accuracy,
             });
           } catch {
-            if (!isDevelopment) {
-              throw new Error("location-unavailable");
-            }
             setGeo({
               status: "error",
-              message:
-                "로컬 개발 환경에서는 브라우저 권한 없이 출퇴근 기록을 시험할 수 있습니다.",
+              message: "",
             });
           }
         }
@@ -383,46 +334,6 @@ function CheckPageContent() {
         const storedRecords = JSON.parse(
           window.localStorage.getItem(DEVELOPMENT_RECORDS_KEY) ?? "[]",
         ) as DevelopmentAttendanceRecord[];
-        const todayRecords = getTodayDevelopmentRecords(
-          storedRecords,
-          timestamp,
-        );
-        const hasCheckedIn = todayRecords.some(
-          (record) => record.type === "IN",
-        );
-        const hasCheckedOut = todayRecords.some(
-          (record) => record.type === "OUT",
-        );
-
-        if (type === "IN" && hasCheckedIn) {
-          setResult({
-            ok: false,
-            message: "오늘 출근이 이미 등록되었습니다.",
-          });
-          return;
-        }
-        if (type === "OUT" && !hasCheckedIn) {
-          setResult({
-            ok: false,
-            message: "출근을 먼저 등록해 주세요.",
-          });
-          return;
-        }
-        if (type === "OUT" && hasCheckedOut) {
-          setResult({
-            ok: false,
-            message: "오늘 퇴근이 이미 등록되었습니다.",
-          });
-          return;
-        }
-        if (hasCheckedOut) {
-          setResult({
-            ok: false,
-            message: "오늘 출퇴근 기록이 이미 완료되었습니다.",
-          });
-          return;
-        }
-
         storedRecords.push({
           type,
           timestamp: timestamp.toISOString(),
@@ -444,7 +355,7 @@ function CheckPageContent() {
           loading: false,
           checkedIn: type === "IN",
           completed: type === "OUT",
-          nextAction: type === "IN" ? "OUT" : null,
+          nextAction: type === "IN" ? "OUT" : "IN",
           checkoutAt: type === "OUT" ? timestamp.toISOString() : null,
           cancelExpiresAt:
             type === "OUT"
@@ -613,19 +524,11 @@ function CheckPageContent() {
   const currentEmployee =
     employees.find((employee) => employee.id === employeeId) ?? null;
   const canCheckIn =
-    !attendanceStatus.loading &&
     !submitting &&
-    !!employeeId &&
-    !attendanceStatus.checkedIn &&
-    !attendanceStatus.completed &&
-    attendanceStatus.nextAction === "IN";
+    !!employeeId;
   const canCheckOut =
-    !attendanceStatus.loading &&
     !submitting &&
-    !!employeeId &&
-    attendanceStatus.checkedIn &&
-    !attendanceStatus.completed &&
-    attendanceStatus.nextAction === "OUT";
+    !!employeeId;
   const cancelRemainingMs = attendanceStatus.cancelExpiresAt
     ? Math.max(
         0,
@@ -676,26 +579,20 @@ function CheckPageContent() {
           onClick={() => submit("IN")}
           className="rounded-xl bg-brand px-6 py-5 text-lg font-bold text-white shadow-sm transition hover:bg-brand-dark disabled:opacity-50"
         >
-          {attendanceStatus.checkedIn || attendanceStatus.completed
-            ? "출근 완료"
-            : "출근"}
+          출근
         </button>
         <button
           disabled={!canCheckOut}
           onClick={() => submit("OUT")}
           className="rounded-xl bg-slate-700 px-6 py-5 text-lg font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
         >
-          {attendanceStatus.completed ? "퇴근 완료" : "퇴근"}
+          퇴근
         </button>
       </div>
       <div className="text-center text-sm font-medium text-slate-500">
         {attendanceStatus.loading
           ? "오늘 출퇴근 상태를 확인하고 있습니다."
-          : attendanceStatus.completed
-            ? "오늘 출근과 퇴근 등록이 완료되었습니다."
-            : attendanceStatus.checkedIn
-              ? "근무 중입니다. 퇴근할 때 퇴근 버튼을 눌러 주세요."
-              : "출근 전입니다. 출근 버튼을 눌러 주세요."}
+          : "출근 또는 퇴근 버튼을 눌러 기록할 수 있습니다."}
       </div>
 
       {canCancelCheckout && (

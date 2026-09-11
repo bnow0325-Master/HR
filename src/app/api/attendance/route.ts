@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isWithinOffice } from "@/lib/location";
 import { isAdmin } from "@/lib/adminAuth";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 
@@ -126,71 +125,20 @@ export async function POST(req: Request) {
     );
   }
 
-  if (typeof latitude !== "number" || typeof longitude !== "number") {
-    return NextResponse.json(
-      {
-        error: "출퇴근 등록 준비가 완료되지 않았습니다. 브라우저 권한을 확인해 주세요.",
-      },
-      { status: 422 },
-    );
-  }
-
-  const geo = isWithinOffice(latitude, longitude);
-  if (!geo.ok) {
-    return NextResponse.json(
-      {
-        error: "현재 출퇴근을 등록할 수 없습니다. 관리자에게 문의해 주세요.",
-      },
-      { status: 403 },
-    );
-  }
-
-  const todayRecords = await prisma.attendanceRecord.findMany({
-    where: {
-      employeeId,
-      cancelledAt: null,
-      timestamp: { gte: todayRange.start, lt: todayRange.end },
-    },
-    select: { type: true },
-    orderBy: { timestamp: "asc" },
-  });
-
-  const hasCheckedIn = todayRecords.some((record) => record.type === "IN");
-  const hasCheckedOut = todayRecords.some((record) => record.type === "OUT");
-
-  if (type === "IN" && hasCheckedIn) {
-    return NextResponse.json(
-      { error: "오늘 출근이 이미 등록되었습니다." },
-      { status: 409 },
-    );
-  }
-  if (type === "OUT" && !hasCheckedIn) {
-    return NextResponse.json(
-      { error: "출근을 먼저 등록해 주세요." },
-      { status: 409 },
-    );
-  }
-  if (type === "OUT" && hasCheckedOut) {
-    return NextResponse.json(
-      { error: "오늘 퇴근이 이미 등록되었습니다." },
-      { status: 409 },
-    );
-  }
-  if (hasCheckedOut) {
-    return NextResponse.json(
-      { error: "오늘 출퇴근 기록이 이미 완료되었습니다." },
-      { status: 409 },
-    );
-  }
+  const hasLocation =
+    typeof latitude === "number" &&
+    Number.isFinite(latitude) &&
+    typeof longitude === "number" &&
+    Number.isFinite(longitude);
 
   const record = await prisma.attendanceRecord.create({
     data: {
       employeeId,
       type,
-      method: "PC_LOCATION",
-      verified: true,
-      latitude,
-      longitude,
+      method: hasLocation ? "PC_LOCATION" : "MANUAL",
+      verified: hasLocation,
+      latitude: hasLocation ? latitude : null,
+      longitude: hasLocation ? longitude : null,
     },
   });
 
