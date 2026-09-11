@@ -36,6 +36,7 @@ model Employee {
   leaveRequests     LeaveRequest[]
   businessTrips     BusinessTrip[]
   naverWorksDailyRecords NaverWorksDailyRecord[]
+  naverWorksAbsenceRecords NaverWorksAbsenceRecord[]
 
   @@index([active, code])
 }
@@ -69,6 +70,27 @@ model NaverWorksDailyRecord {
   @@unique([employeeId, baseDate])
   @@index([baseDate])
   @@index([sourceLoginId])
+}
+
+model NaverWorksAbsenceRecord {
+  id                String   @id @default(cuid())
+  employee          Employee @relation(fields: [employeeId], references: [id])
+  employeeId        String
+  sourceDocumentNo  String   @unique
+  absenceType       String
+  unitsDays         Decimal  @db.Decimal(5, 2)
+  startDate         DateTime @db.Date
+  endDate           DateTime @db.Date
+  timeDetail        String?  @db.Text
+  sourceDepartment  String?  @db.Text
+  submittedOn       DateTime? @db.Date
+  cancelled         Boolean  @default(false)
+  sourceSystem      String   @default("NAVER_WORKS")
+  importedAt        DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([employeeId, startDate])
+  @@index([absenceType, startDate])
 }
 
 model AttendanceRecord {
