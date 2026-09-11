@@ -97,11 +97,15 @@ function workbookRows(buffer: Buffer) {
   if (!xml) throw new Error("엑셀 시트를 찾지 못했습니다.");
   return [...xml.matchAll(new RegExp(`<${xmlTag("row")}\\b[^>]*>([\\s\\S]*?)<\\/${xmlTag("row")}>`, "g"))].map((rowMatch) => {
     const row: string[] = [];
-    for (const cellMatch of rowMatch[1].matchAll(new RegExp(`<${xmlTag("c")}\\b([^>]*)>([\\s\\S]*?)<\\/${xmlTag("c")}>`, "g"))) {
+    // Empty cells are self-closing (<x:c .../>). Treating them as open cells
+    // would consume the next value and shift every following column.
+    const cellPattern = new RegExp(`<${xmlTag("c")}\\b([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/${xmlTag("c")}>)`, "g");
+    for (const cellMatch of rowMatch[1].matchAll(cellPattern)) {
       const ref = /r="([^"]+)"/.exec(cellMatch[1])?.[1];
       if (!ref) continue;
-      const value = new RegExp(`<${xmlTag("v")}>([\\s\\S]*?)<\\/${xmlTag("v")}>`).exec(cellMatch[2])?.[1]
-        ?? new RegExp(`<${xmlTag("is")}[^>]*>([\\s\\S]*?)<\\/${xmlTag("is")}>`).exec(cellMatch[2])?.[1]
+      const content = cellMatch[2] ?? "";
+      const value = new RegExp(`<${xmlTag("v")}>([\\s\\S]*?)<\\/${xmlTag("v")}>`).exec(content)?.[1]
+        ?? new RegExp(`<${xmlTag("is")}[^>]*>([\\s\\S]*?)<\\/${xmlTag("is")}>`).exec(content)?.[1]
         ?? "";
       const isShared = /t="s"/.test(cellMatch[1]);
       row[columnIndex(ref)] = isShared ? strings[Number(value)] ?? "" : text(value);
