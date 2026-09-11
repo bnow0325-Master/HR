@@ -748,7 +748,7 @@ function TodayList({ records }: { records: AttendanceRow[] }) {
             <th className="px-4 py-3 font-medium">직원</th>
             <th className="px-4 py-3 font-medium">부서</th>
             <th className="px-4 py-3 font-medium">구분</th>
-            <th className="px-4 py-3 font-medium">위치</th>
+            <th className="px-4 py-3 font-medium">기록 위치</th>
             <th className="px-4 py-3 font-medium">확인</th>
           </tr>
         </thead>
