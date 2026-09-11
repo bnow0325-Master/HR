@@ -43,6 +43,10 @@ function text(value: string | undefined) {
   return decode(value ?? "").replace(/<[^>]+>/g, "").trim();
 }
 
+// NAVER WORKS exports namespace-prefixed spreadsheet XML (for example x:row).
+// Accept both the standard and prefixed OpenXML element forms.
+const xmlTag = (name: string) => `(?:[A-Za-z_][\\w.-]*:)?${name}`;
+
 function columnIndex(ref: string) {
   return ref.replace(/\d/g, "").split("").reduce((index, char) => index * 26 + char.charCodeAt(0) - 64, 0) - 1;
 }
@@ -87,16 +91,18 @@ function zipFile(buffer: Buffer, index: ZipEntry[], name: string) {
 function workbookRows(buffer: Buffer) {
   const index = entries(buffer);
   const shared = zipFile(buffer, index, "xl/sharedStrings.xml") ?? "";
-  const strings = [...shared.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map((match) => text(match[1]));
+  const strings = [...shared.matchAll(new RegExp(`<${xmlTag("si")}\\b[^>]*>([\\s\\S]*?)<\\/${xmlTag("si")}>`, "g"))].map((match) => text(match[1]));
   const sheet = index.map((item) => item.name).find((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name));
   const xml = sheet ? zipFile(buffer, index, sheet) : null;
   if (!xml) throw new Error("엑셀 시트를 찾지 못했습니다.");
-  return [...xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)].map((rowMatch) => {
+  return [...xml.matchAll(new RegExp(`<${xmlTag("row")}\\b[^>]*>([\\s\\S]*?)<\\/${xmlTag("row")}>`, "g"))].map((rowMatch) => {
     const row: string[] = [];
-    for (const cellMatch of rowMatch[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
+    for (const cellMatch of rowMatch[1].matchAll(new RegExp(`<${xmlTag("c")}\\b([^>]*)>([\\s\\S]*?)<\\/${xmlTag("c")}>`, "g"))) {
       const ref = /r="([^"]+)"/.exec(cellMatch[1])?.[1];
       if (!ref) continue;
-      const value = /<v>([\s\S]*?)<\/v>/.exec(cellMatch[2])?.[1] ?? "";
+      const value = new RegExp(`<${xmlTag("v")}>([\\s\\S]*?)<\\/${xmlTag("v")}>`).exec(cellMatch[2])?.[1]
+        ?? new RegExp(`<${xmlTag("is")}[^>]*>([\\s\\S]*?)<\\/${xmlTag("is")}>`).exec(cellMatch[2])?.[1]
+        ?? "";
       const isShared = /t="s"/.test(cellMatch[1]);
       row[columnIndex(ref)] = isShared ? strings[Number(value)] ?? "" : text(value);
     }
