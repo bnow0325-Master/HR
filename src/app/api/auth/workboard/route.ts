@@ -6,12 +6,13 @@ import {
   workboardSessionMaxAge,
 } from "@/lib/workboardSession";
 import {
+  hrPublicUrl,
   safeWorkboardReturnTo,
   verifyWorkboardHandoff,
 } from "@/lib/workboardHandoff";
 
-function companyLoginUrl(request: NextRequest, returnTo: string) {
-  const url = new URL("/api/auth/company/login", request.nextUrl.origin);
+function companyLoginUrl(returnTo: string) {
+  const url = hrPublicUrl("/api/auth/company/login");
   url.searchParams.set("returnTo", safeWorkboardReturnTo(returnTo));
   return url;
 }
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     });
     if (!employee?.email) throw new Error("Active HR employee was not found.");
 
-    const response = NextResponse.redirect(new URL(returnTo, request.nextUrl.origin), 303);
+    const response = NextResponse.redirect(hrPublicUrl(returnTo), 303);
     response.cookies.set({
       name: workboardSessionCookieName,
       value: createWorkboardSessionToken(employee.id, employee.email),
@@ -57,6 +58,6 @@ export async function POST(request: NextRequest) {
     response.headers.set("Referrer-Policy", "no-referrer");
     return response;
   } catch {
-    return NextResponse.redirect(companyLoginUrl(request, returnTo), 303);
+    return NextResponse.redirect(companyLoginUrl(returnTo), 303);
   }
 }
