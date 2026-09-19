@@ -637,7 +637,7 @@ function CheckPageContent() {
         <section className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-slate-700">
           <h2 className="font-bold text-slate-900">출퇴근 위치 기록 안내</h2>
           <p className="mt-1 leading-6">
-            본사 근무자와 출장 근무자를 구분하기 위해 출퇴근 등록 시 현재 위치를 1회 기록합니다. 위치정보는 출퇴근 확인 목적으로만 사용하며 관리자만 조회할 수 있습니다.
+            출퇴근 등록 시 현재 위치를 1회 기록합니다. 위치정보는 출장기록부와 연동되며 관리자만 조회할 수 있습니다.
           </p>
           <button
             type="button"
@@ -652,7 +652,7 @@ function CheckPageContent() {
 
       {locationConsentStatus === "granted" && (
         <p className="text-center text-xs text-slate-400">
-          출퇴근 시 현재 위치를 기록합니다. 위치정보는 관리자만 조회할 수 있습니다.
+          출퇴근 시 현재 위치를 기록합니다. 위치정보는 출장기록부와 연동됩니다.
         </p>
       )}
 
