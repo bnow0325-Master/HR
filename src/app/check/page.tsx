@@ -39,6 +39,8 @@ type AttendanceStatus = {
   cancelExpiresAt: string | null;
 };
 
+type LocationConsentStatus = "loading" | "required" | "granted" | "error";
+
 type DevelopmentAttendanceRecord = {
   type: "IN" | "OUT";
   timestamp: string;
@@ -55,6 +57,7 @@ const DEVELOPMENT_EMPLOYEE: Employee = {
 
 const DEVELOPMENT_RECORDS_KEY = "checkinoutDevelopmentRecords";
 const DEVELOPMENT_EMPLOYEES_KEY = "checkinoutDevelopmentEmployees";
+const DEVELOPMENT_LOCATION_CONSENT_KEY = "checkinoutLocationConsent";
 const CHECKOUT_CANCEL_WINDOW_MS = 30 * 60 * 1000;
 
 function loadDevelopmentEmployees() {
@@ -137,6 +140,9 @@ function CheckPageContent() {
   });
   const [cancelClock, setCancelClock] = useState(() => Date.now());
   const [statusRefreshKey, setStatusRefreshKey] = useState(0);
+  const [locationConsentStatus, setLocationConsentStatus] =
+    useState<LocationConsentStatus>(isDevelopment ? "required" : "loading");
+  const [agreeingLocationConsent, setAgreeingLocationConsent] = useState(false);
 
   useEffect(() => {
     if (isDevelopment) {
@@ -268,6 +274,37 @@ function CheckPageContent() {
   }, [employeeId, isDevelopment]);
 
   useEffect(() => {
+    if (!employeeId) return;
+
+    if (isDevelopment) {
+      setLocationConsentStatus(
+        window.localStorage.getItem(DEVELOPMENT_LOCATION_CONSENT_KEY) === "granted"
+          ? "granted"
+          : "required",
+      );
+      return;
+    }
+
+    let cancelled = false;
+    fetch("/api/location-consent", { cache: "no-store" })
+      .then(async (response) => {
+        const data = (await response.json()) as { consented?: boolean };
+        if (!response.ok) throw new Error();
+        return Boolean(data.consented);
+      })
+      .then((consented) => {
+        if (!cancelled) setLocationConsentStatus(consented ? "granted" : "required");
+      })
+      .catch(() => {
+        if (!cancelled) setLocationConsentStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId, isDevelopment]);
+
+  useEffect(() => {
     if (!attendanceStatus.completed || !attendanceStatus.cancelExpiresAt) {
       return;
     }
@@ -300,10 +337,10 @@ function CheckPageContent() {
       let latitude: number | undefined;
       let longitude: number | undefined;
 
-      if (geo.status === "ready") {
+      if (locationConsentStatus === "granted" && geo.status === "ready") {
         latitude = geo.lat;
         longitude = geo.lng;
-      } else {
+      } else if (locationConsentStatus === "granted") {
         if (!("geolocation" in navigator)) {
           setGeo({ status: "error", message: "" });
         } else {
@@ -418,6 +455,29 @@ function CheckPageContent() {
       });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function agreeToLocationCollection() {
+    setAgreeingLocationConsent(true);
+    try {
+      if (isDevelopment) {
+        window.localStorage.setItem(DEVELOPMENT_LOCATION_CONSENT_KEY, "granted");
+        setLocationConsentStatus("granted");
+        return;
+      }
+
+      const response = await fetch("/api/location-consent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agreed: true }),
+      });
+      if (!response.ok) throw new Error();
+      setLocationConsentStatus("granted");
+    } catch {
+      setLocationConsentStatus("error");
+    } finally {
+      setAgreeingLocationConsent(false);
     }
   }
 
@@ -572,6 +632,29 @@ function CheckPageContent() {
       </div>
 
       <CurrentWorkStatus refreshKey={statusRefreshKey} />
+
+      {locationConsentStatus === "required" && (
+        <section className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-slate-700">
+          <h2 className="font-bold text-slate-900">출퇴근 위치 기록 안내</h2>
+          <p className="mt-1 leading-6">
+            출퇴근 등록 시 현재 위치를 1회 기록합니다. 위치정보는 출장기록부와 연동됩니다.
+          </p>
+          <button
+            type="button"
+            onClick={() => void agreeToLocationCollection()}
+            disabled={agreeingLocationConsent}
+            className="mt-3 w-full rounded-lg bg-brand px-4 py-3 font-bold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {agreeingLocationConsent ? "처리 중..." : "동의하고 위치 기록하기"}
+          </button>
+        </section>
+      )}
+
+      {locationConsentStatus === "granted" && (
+        <p className="text-center text-xs text-slate-400">
+          출퇴근 시 현재 위치를 기록합니다. 위치정보는 출장기록부와 연동됩니다.
+        </p>
+      )}
 
       <div className="mt-2 grid grid-cols-2 gap-3">
         <button

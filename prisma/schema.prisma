@@ -28,6 +28,8 @@ model Employee {
   attendanceEnabled Boolean            @default(true)
   leaveEnabled      Boolean            @default(true)
   workboardEnabled  Boolean            @default(false)
+  locationConsentAt DateTime?
+  locationConsentVersion String?
   pinHash           String?
   active            Boolean            @default(true)
   createdAt         DateTime           @default(now())
