@@ -2,6 +2,7 @@ import { jwtVerify } from "jose";
 
 export const WORKBOARD_HANDOFF_AUDIENCE = "bnow-hr";
 const DEFAULT_WORKBOARD_ORIGIN = "https://main.bnow.co.kr";
+const DEFAULT_HR_PUBLIC_ORIGIN = "https://hr.bnow.co.kr";
 const ALLOWED_RETURN_PATHS = new Set([
   "/attendance",
   "/check",
@@ -17,6 +18,12 @@ export function safeWorkboardReturnTo(value: unknown) {
   if (typeof value !== "string" || value.length > 2_048) return "/attendance";
   const path = value.split("?", 1)[0] || "";
   return ALLOWED_RETURN_PATHS.has(path) ? value : "/attendance";
+}
+
+export function hrPublicUrl(pathname: string) {
+  const origin = (process.env.HR_PUBLIC_ORIGIN?.trim() || DEFAULT_HR_PUBLIC_ORIGIN)
+    .replace(/\/$/, "");
+  return new URL(pathname, `${origin}/`);
 }
 
 function configuration() {

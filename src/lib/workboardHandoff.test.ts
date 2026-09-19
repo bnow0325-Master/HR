@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SignJWT } from "jose";
 import {
+  hrPublicUrl,
   safeWorkboardReturnTo,
   verifyWorkboardHandoff,
   WORKBOARD_HANDOFF_AUDIENCE,
@@ -10,6 +11,7 @@ import {
 const secret = "test-workboard-sso-secret-that-is-long-enough";
 process.env.WORKBOARD_SSO_SECRET = secret;
 process.env.WORKBOARD_ORIGIN = "https://main.bnow.co.kr";
+process.env.HR_PUBLIC_ORIGIN = "https://hr.bnow.co.kr";
 
 async function ticket(overrides: Record<string, unknown> = {}) {
   return new SignJWT({
@@ -50,4 +52,12 @@ test("WorkBoard handoff return path cannot leave HR", () => {
   assert.equal(safeWorkboardReturnTo("//evil.example"), "/attendance");
   assert.equal(safeWorkboardReturnTo("https://evil.example"), "/attendance");
   assert.equal(safeWorkboardReturnTo("/admin/employees"), "/admin/employees");
+});
+
+test("WorkBoard handoff redirects through the public HR origin", () => {
+  assert.equal(hrPublicUrl("/check").toString(), "https://hr.bnow.co.kr/check");
+  assert.equal(
+    hrPublicUrl("/api/auth/company/login").toString(),
+    "https://hr.bnow.co.kr/api/auth/company/login",
+  );
 });
