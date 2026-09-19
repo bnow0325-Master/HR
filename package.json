@@ -12,7 +12,7 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
-    "test:identity": "tsx --test src/lib/companyIdentity.test.ts src/lib/companyOidc.test.ts src/lib/customerChatAccess.test.ts",
+    "test:identity": "tsx --test src/lib/companyIdentity.test.ts src/lib/companyOidc.test.ts src/lib/customerChatAccess.test.ts src/lib/workboardHandoff.test.ts",
     "test:database": "tsx --test src/lib/mariaDbConfig.test.ts src/lib/employeeDirectory.test.ts",
     "test:profile-photo": "tsx --test src/lib/profilePhoto.test.ts",
     "identity:reconcile": "tsx scripts/reconcile-company-identity.ts",
