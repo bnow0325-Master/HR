@@ -21,6 +21,8 @@ __pycache__/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*-output*.log
+*-error*.log
 
 # local env files
 .env

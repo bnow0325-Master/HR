@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/adminAuth";
+import { hasCurrentLocationConsent } from "@/lib/locationConsent";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 
 type CheckBody = {
@@ -125,11 +126,19 @@ export async function POST(req: Request) {
     );
   }
 
-  const hasLocation =
+  const requestedLocation =
     typeof latitude === "number" &&
     Number.isFinite(latitude) &&
     typeof longitude === "number" &&
     Number.isFinite(longitude);
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { locationConsentAt: true, locationConsentVersion: true },
+  });
+  const hasLocation =
+    requestedLocation &&
+    employee !== null &&
+    hasCurrentLocationConsent(employee);
 
   const record = await prisma.attendanceRecord.create({
     data: {
