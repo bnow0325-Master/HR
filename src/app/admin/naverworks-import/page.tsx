@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/adminAuth";
 import NaverWorksImportForm from "./NaverWorksImportForm";
 import NaverWorksEmployeeSyncForm from "./NaverWorksEmployeeSyncForm";
+import NaverWorksAbsenceImportForm from "./NaverWorksAbsenceImportForm";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ export default async function NaverWorksImportPage() {
       <NaverWorksEmployeeSyncForm />
       <div className="my-6 border-t border-slate-200" />
       <NaverWorksImportForm />
+      <div className="my-6 border-t border-slate-200" />
+      <NaverWorksAbsenceImportForm />
       <section className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
         <h2 className="font-bold text-slate-900">가져오기 기준</h2>
         <ul className="mt-3 list-disc space-y-1 pl-5">
@@ -28,6 +31,7 @@ export default async function NaverWorksImportPage() {
           <li>분석 단계는 HR 데이터와 직원정보를 변경하지 않습니다.</li>
           <li>확정 반영 시에는 로그인 아이디를 우선 사용하고, 없으면 동명이인이 아닌 이름만 매칭합니다.</li>
           <li>재직자 계정 동기화는 로그인 ID만 보완하며, 원장 미포함만으로 퇴사 처리하지 않습니다.</li>
+          <li>휴가·출장은 문서번호를 보존한 별도 이전 원장으로 저장하여 기존 HR 신청 건과 섞이지 않습니다.</li>
         </ul>
       </section>
     </main>

@@ -7,37 +7,38 @@ datasource db {
 }
 
 model Employee {
-  id                String             @id @default(cuid())
-  code              String             @unique
-  name              String
-  department        String?
-  position          String?
-  email             String?            @unique
-  externalLoginId   String?            @unique
-  phone             String?
-  personalEmail     String?            @unique
-  homeAddress       String?            @db.Text
-  emergencyContactPhone String?
-  profilePhotoData  Bytes?
-  profilePhotoMimeType String?
-  profilePhotoUpdatedAt DateTime?
-  hireDate          DateTime?
-  terminationDate   DateTime?
-  workMinutesPerDay Int                @default(480)
-  systemRole        String             @default("MEMBER")
-  attendanceEnabled Boolean            @default(true)
-  leaveEnabled      Boolean            @default(true)
-  workboardEnabled  Boolean            @default(false)
-  locationConsentAt DateTime?
-  locationConsentVersion String?
-  pinHash           String?
-  active            Boolean            @default(true)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @default(now()) @updatedAt
-  records           AttendanceRecord[]
-  leaveRequests     LeaveRequest[]
-  businessTrips     BusinessTrip[]
-  naverWorksDailyRecords NaverWorksDailyRecord[]
+  id                       String                    @id @default(cuid())
+  code                     String                    @unique
+  name                     String
+  department               String?
+  position                 String?
+  email                    String?                   @unique
+  externalLoginId          String?                   @unique
+  phone                    String?
+  personalEmail            String?                   @unique
+  homeAddress              String?                   @db.Text
+  emergencyContactPhone    String?
+  profilePhotoData         Bytes?
+  profilePhotoMimeType     String?
+  profilePhotoUpdatedAt    DateTime?
+  hireDate                 DateTime?
+  terminationDate          DateTime?
+  workMinutesPerDay        Int                       @default(480)
+  systemRole               String                    @default("MEMBER")
+  attendanceEnabled        Boolean                   @default(true)
+  leaveEnabled             Boolean                   @default(true)
+  workboardEnabled         Boolean                   @default(false)
+  locationConsentAt        DateTime?
+  locationConsentVersion   String?
+  pinHash                  String?
+  active                   Boolean                   @default(true)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @default(now()) @updatedAt
+  records                  AttendanceRecord[]
+  leaveRequests            LeaveRequest[]
+  businessTrips            BusinessTrip[]
+  naverWorksDailyRecords   NaverWorksDailyRecord[]
+  naverWorksAbsenceRecords NaverWorksAbsenceRecord[]
 
   @@index([active, code])
 }
@@ -73,6 +74,28 @@ model NaverWorksDailyRecord {
   @@index([sourceLoginId])
 }
 
+// Immutable archive of NAVER WORKS absence documents. These records are kept
+// separate from new HR requests so the original document number remains auditable.
+model NaverWorksAbsenceRecord {
+  id                 String    @id @default(cuid())
+  employee           Employee  @relation(fields: [employeeId], references: [id])
+  employeeId         String
+  sourceDocumentNo   String    @unique
+  sourceEmployeeName String
+  sourceDepartment   String?
+  absenceType        String
+  unitsMinutes       Int
+  periodText         String    @db.Text
+  requestedOn        DateTime? @db.Date
+  status             String    @default("IMPORTED")
+  sourceRow          Int
+  importedAt         DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([employeeId, requestedOn])
+  @@index([absenceType, requestedOn])
+}
+
 model AttendanceRecord {
   id          String    @id @default(cuid())
   employee    Employee  @relation(fields: [employeeId], references: [id])
@@ -83,7 +106,7 @@ model AttendanceRecord {
   verified    Boolean   @default(false)
   latitude    Float?
   longitude   Float?
-  note        String?    @db.Text
+  note        String?   @db.Text
   cancelledAt DateTime?
   cancelNote  String?
   createdAt   DateTime  @default(now())
@@ -93,37 +116,37 @@ model AttendanceRecord {
 }
 
 model LeaveRequest {
-  id             String   @id @default(cuid())
-  employee       Employee @relation(fields: [employeeId], references: [id])
-  employeeId     String
-  leaveType      String
-  leaveDate      DateTime
-  unitsMinutes   Int
-  reason         String?   @db.Text
-  status         String   @default("PENDING")
-  reviewerNote   String?   @db.Text
-  reviewedAt     DateTime?
+  id              String    @id @default(cuid())
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  employeeId      String
+  leaveType       String
+  leaveDate       DateTime
+  unitsMinutes    Int
+  reason          String?   @db.Text
+  status          String    @default("PENDING")
+  reviewerNote    String?   @db.Text
+  reviewedAt      DateTime?
   reviewedByEmail String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([employeeId, leaveDate])
   @@index([status, leaveDate])
 }
 
 model BusinessTrip {
-  id         String   @id @default(cuid())
-  employee   Employee @relation(fields: [employeeId], references: [id])
-  employeeId String
-  startDate  DateTime
-  endDate    DateTime
-  reason     String   @db.Text
-  status          String   @default("PENDING")
-  reviewerNote    String?  @db.Text
+  id              String    @id @default(cuid())
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  employeeId      String
+  startDate       DateTime
+  endDate         DateTime
+  reason          String    @db.Text
+  status          String    @default("PENDING")
+  reviewerNote    String?   @db.Text
   reviewedAt      DateTime?
   reviewedByEmail String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([employeeId, startDate, endDate])
   @@index([status, startDate])
