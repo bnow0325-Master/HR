@@ -88,7 +88,7 @@ function zipFile(buffer: Buffer, index: ZipEntry[], name: string) {
   throw new Error("지원하지 않는 엑셀 압축 방식입니다.");
 }
 
-function workbookRows(buffer: Buffer) {
+export function readNaverWorksWorkbookRows(buffer: Buffer) {
   const index = entries(buffer);
   const shared = zipFile(buffer, index, "xl/sharedStrings.xml") ?? "";
   const strings = [...shared.matchAll(new RegExp(`<${xmlTag("si")}\\b[^>]*>([\\s\\S]*?)<\\/${xmlTag("si")}>`, "g"))].map((match) => text(match[1]));
@@ -134,7 +134,7 @@ function parseMinutes(value: string) {
 }
 
 export function parseNaverWorksCommuteWorkbook(buffer: Buffer) {
-  const rows = workbookRows(buffer);
+  const rows = readNaverWorksWorkbookRows(buffer);
   const headers = rows[0]?.map((value) => value.trim()) ?? [];
   const positions = new Map(headers.map((header, index) => [header, index]));
   const missing = REQUIRED_HEADERS.filter((header) => !positions.has(header));
