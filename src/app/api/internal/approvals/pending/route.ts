@@ -28,9 +28,24 @@ export async function GET(request: Request) {
     );
   }
 
-  const [leaveCount, businessTripCount] = await Promise.all([
+  const email = new URL(request.url).searchParams.get("email")?.trim().toLowerCase() ?? "";
+  const employee = email
+    ? await prisma.employee.findUnique({
+        where: { email },
+        select: { id: true, active: true },
+      })
+    : null;
+  const employeeId = employee?.active ? employee.id : null;
+
+  const [leaveCount, businessTripCount, submittedLeaveCount, submittedBusinessTripCount] = await Promise.all([
     prisma.leaveRequest.count({ where: { status: "PENDING" } }),
     prisma.businessTrip.count({ where: { status: "PENDING" } }),
+    employeeId
+      ? prisma.leaveRequest.count({ where: { employeeId, status: "PENDING" } })
+      : Promise.resolve(0),
+    employeeId
+      ? prisma.businessTrip.count({ where: { employeeId, status: "PENDING" } })
+      : Promise.resolve(0),
   ]);
 
   return NextResponse.json(
@@ -38,7 +53,11 @@ export async function GET(request: Request) {
       pendingCount: leaveCount + businessTripCount,
       leaveCount,
       businessTripCount,
+      submittedPendingCount: submittedLeaveCount + submittedBusinessTripCount,
+      submittedLeaveCount,
+      submittedBusinessTripCount,
       approvalUrl: "/admin/approvals",
+      submittedApprovalUrl: "/leave",
     },
     { headers: responseHeaders() },
   );
