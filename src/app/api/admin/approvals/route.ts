@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 import { notifyEmployeeAboutApprovalDecision } from "@/lib/workboardApprovalNotifications";
 
+type ApprovalKind = "leave" | "business-trip";
 type ApprovalBody = {
-  kind?: "leave" | "business-trip";
+  kind?: ApprovalKind;
   requestId?: string;
   action?: "APPROVE" | "REJECT";
   reviewerNote?: string;
@@ -44,13 +45,16 @@ export async function GET() {
     }),
   ]);
 
-  return NextResponse.json({ leaveRequests, businessTrips });
+  return NextResponse.json(
+    { leaveRequests, businessTrips },
+    { headers: { "Cache-Control": "private, no-store, max-age=0" } },
+  );
 }
 
-export async function PATCH(req: Request) {
+export async function PATCH(request: Request) {
   let body: ApprovalBody;
   try {
-    body = await req.json();
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
@@ -60,72 +64,71 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
   }
   if (
-    !body.requestId ||
-    !body.kind ||
-    !body.action ||
+    !body.requestId || !body.kind || !body.action ||
     !["leave", "business-trip"].includes(body.kind) ||
     !["APPROVE", "REJECT"].includes(body.action)
   ) {
     return NextResponse.json({ error: "결재 정보를 확인해 주세요." }, { status: 400 });
   }
+  const requestId = body.requestId;
+  const kind = body.kind;
+  const action = body.action;
 
-  const reviewerNote = body.reviewerNote?.trim().slice(0, 1000) || null;
-  const decision: "APPROVED" | "REJECTED" =
-    body.action === "APPROVE" ? "APPROVED" : "REJECTED";
-  const reviewData = {
-    status: decision,
-    reviewerNote,
-    reviewedAt: new Date(),
-    reviewedByEmail: admin.email,
-  };
+  const reviewerNote = body.reviewerNote?.trim().slice(0, 1000) ?? "";
+  if (!reviewerNote) {
+    return NextResponse.json(
+      { error: action === "APPROVE" ? "승인 사유를 입력해 주세요." : "반려 사유를 입력해 주세요." },
+      { status: 400 },
+    );
+  }
 
-  if (body.kind === "leave") {
-    const request = await prisma.leaveRequest.findFirst({
-      where: { id: body.requestId, status: "PENDING" },
-      include: { employee: { select: { name: true, code: true, email: true } } },
-    });
-    if (!request) {
-      return NextResponse.json(
-        { error: "이미 처리되었거나 찾을 수 없는 휴가 신청입니다." },
-        { status: 409 },
-      );
+  const decision: "APPROVED" | "REJECTED" = action === "APPROVE" ? "APPROVED" : "REJECTED";
+  const reviewedAt = new Date();
+
+  const notification = await prisma.$transaction(async (tx) => {
+    if (kind === "leave") {
+      const leave = await tx.leaveRequest.findFirst({
+        where: { id: requestId, status: "PENDING" },
+        include: { employee: { select: { id: true, name: true, code: true, email: true } } },
+      });
+      if (!leave) return null;
+
+      const updated = await tx.leaveRequest.updateMany({
+        where: { id: requestId, status: "PENDING" },
+        data: { status: decision, reviewerNote, reviewedAt, reviewedByEmail: admin.email },
+      });
+      if (updated.count !== 1) return null;
+      await tx.approvalAudit.create({
+        data: {
+          employeeId: leave.employee.id,
+          requestKind: "leave",
+          requestId: leave.id,
+          action,
+          fromStatus: "PENDING",
+          toStatus: decision,
+          actorEmail: admin.email,
+          actorName: admin.name,
+          note: reviewerNote,
+        },
+      });
+      const leaveLabel = leave.leaveType === "ANNUAL" ? "연차" : leave.leaveType === "AM_HALF" ? "오전 반차" : "오후 반차";
+      return {
+        kind: "leave" as const,
+        requestId: leave.id,
+        employeeName: leave.employee.name,
+        employeeCode: leave.employee.code,
+        employeeEmail: leave.employee.email,
+        description: `${leave.leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveLabel}`,
+      };
     }
-    const updated = await prisma.leaveRequest.updateMany({
-      where: { id: body.requestId, status: "PENDING" },
-      data: reviewData,
+
+    const trip = await tx.businessTrip.findFirst({
+      where: { id: requestId, status: "PENDING" },
+      include: { employee: { select: { id: true, name: true, code: true, email: true } } },
     });
-    if (updated.count === 0) {
-      return NextResponse.json(
-        { error: "이미 처리되었거나 찾을 수 없는 휴가 신청입니다." },
-        { status: 409 },
-      );
-    }
-    const leaveLabel = request.leaveType === "ANNUAL"
-      ? "연차"
-      : request.leaveType === "AM_HALF" ? "오전 반차" : "오후 반차";
-    await notifyEmployeeAboutApprovalDecision({
-      kind: "leave",
-      requestId: request.id,
-      employeeName: request.employee.name,
-      employeeCode: request.employee.code,
-      employeeEmail: request.employee.email,
-      description: `${request.leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveLabel}`,
-      decision,
-      reviewerNote,
-    });
-  } else {
-    const trip = await prisma.businessTrip.findFirst({
-      where: { id: body.requestId, status: "PENDING" },
-      include: { employee: { select: { name: true, code: true, email: true } } },
-    });
-    if (!trip) {
-      return NextResponse.json(
-        { error: "이미 처리되었거나 찾을 수 없는 출장 신청입니다." },
-        { status: 409 },
-      );
-    }
-    if (body.action === "APPROVE") {
-      const overlap = await prisma.businessTrip.findFirst({
+    if (!trip) return null;
+    if (action === "APPROVE") {
+      const overlap = await tx.businessTrip.findFirst({
         where: {
           employeeId: trip.employeeId,
           status: "APPROVED",
@@ -134,34 +137,47 @@ export async function PATCH(req: Request) {
         },
         select: { id: true },
       });
-      if (overlap) {
-        return NextResponse.json(
-          { error: "확정된 출장 일정과 기간이 겹쳐 승인할 수 없습니다." },
-          { status: 409 },
-        );
-      }
+      if (overlap) throw new Error("APPROVED_TRIP_OVERLAP");
     }
-    const updated = await prisma.businessTrip.updateMany({
-      where: { id: body.requestId, status: "PENDING" },
-      data: reviewData,
+
+    const updated = await tx.businessTrip.updateMany({
+      where: { id: requestId, status: "PENDING" },
+      data: { status: decision, reviewerNote, reviewedAt, reviewedByEmail: admin.email },
     });
-    if (updated.count === 0) {
-      return NextResponse.json(
-        { error: "출장 신청 상태가 변경되어 다시 확인해 주세요." },
-        { status: 409 },
-      );
-    }
-    await notifyEmployeeAboutApprovalDecision({
-      kind: "business-trip",
-      requestId: body.requestId,
+    if (updated.count !== 1) return null;
+    await tx.approvalAudit.create({
+      data: {
+        employeeId: trip.employee.id,
+        requestKind: "business-trip",
+        requestId: trip.id,
+        action,
+        fromStatus: "PENDING",
+        toStatus: decision,
+        actorEmail: admin.email,
+        actorName: admin.name,
+        note: reviewerNote,
+      },
+    });
+    return {
+      kind: "business-trip" as const,
+      requestId: trip.id,
       employeeName: trip.employee.name,
       employeeCode: trip.employee.code,
       employeeEmail: trip.employee.email,
       description: `${trip.startDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ~ ${trip.endDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })}`,
-      decision,
-      reviewerNote,
-    });
+    };
+  }).catch((error: unknown) => {
+    if (error instanceof Error && error.message === "APPROVED_TRIP_OVERLAP") return "overlap" as const;
+    throw error;
+  });
+
+  if (notification === "overlap") {
+    return NextResponse.json({ error: "확정된 출장 일정과 기간이 겹쳐 승인할 수 없습니다." }, { status: 409 });
+  }
+  if (!notification) {
+    return NextResponse.json({ error: "이미 처리되었거나 찾을 수 없는 신청입니다." }, { status: 409 });
   }
 
+  await notifyEmployeeAboutApprovalDecision({ ...notification, decision, reviewerNote });
   return NextResponse.json({ ok: true });
 }

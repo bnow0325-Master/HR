@@ -37,6 +37,8 @@ model Employee {
   records                  AttendanceRecord[]
   leaveRequests            LeaveRequest[]
   businessTrips            BusinessTrip[]
+  approvalAudits           ApprovalAudit[]
+  approvalDocuments        ApprovalDocument[]
   naverWorksDailyRecords   NaverWorksDailyRecord[]
   naverWorksAbsenceRecords NaverWorksAbsenceRecord[]
 
@@ -150,4 +152,82 @@ model BusinessTrip {
 
   @@index([employeeId, startDate, endDate])
   @@index([status, startDate])
+}
+
+model ApprovalAudit {
+  id             String   @id @default(cuid())
+  employee       Employee @relation(fields: [employeeId], references: [id])
+  employeeId     String
+  requestKind    String
+  requestId      String
+  action         String
+  fromStatus     String?
+  toStatus       String
+  actorEmail     String?
+  actorName      String
+  note           String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([requestKind, requestId, createdAt])
+  @@index([employeeId, createdAt])
+}
+
+model ApprovalTemplate {
+  id             String             @id @default(cuid())
+  name           String
+  description    String?            @db.Text
+  fieldsJson     String             @db.Text
+  active         Boolean            @default(true)
+  createdByEmail String
+  updatedByEmail String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  documents      ApprovalDocument[]
+
+  @@index([active, updatedAt])
+}
+
+model ApprovalDocument {
+  id                String          @id @default(cuid())
+  documentNo        String          @unique
+  template          ApprovalTemplate @relation(fields: [templateId], references: [id])
+  templateId        String
+  templateName      String
+  templateFieldsJson String           @db.Text
+  requester         Employee        @relation(fields: [requesterId], references: [id])
+  requesterId       String
+  requesterEmail    String
+  requesterName     String
+  requesterDepartment String?
+  title             String
+  valuesJson        String          @db.Text
+  status            String          @default("PENDING")
+  approverEmail     String
+  approverName      String
+  decisionNote      String?         @db.Text
+  submittedAt       DateTime        @default(now())
+  decidedAt         DateTime?
+  version           Int             @default(1)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  events            ApprovalDocumentEvent[]
+
+  @@index([requesterId, submittedAt])
+  @@index([status, submittedAt])
+  @@index([approverEmail, status, submittedAt])
+}
+
+model ApprovalDocumentEvent {
+  id            String           @id @default(cuid())
+  document      ApprovalDocument @relation(fields: [documentId], references: [id])
+  documentId    String
+  action        String
+  fromStatus    String?
+  toStatus      String
+  actorEmail    String
+  actorName     String
+  note          String?          @db.Text
+  createdAt     DateTime         @default(now())
+
+  @@index([documentId, createdAt])
 }

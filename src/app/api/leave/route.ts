@@ -197,15 +197,30 @@ export async function POST(req: Request) {
     );
   }
 
-  const request = await prisma.leaveRequest.create({
-    data: {
-      employeeId,
-      leaveType,
-      leaveDate,
-      unitsMinutes,
-      reason: body.reason?.trim() || null,
-    },
-    select: leaveRequestSelect,
+  const request = await prisma.$transaction(async (tx) => {
+    const created = await tx.leaveRequest.create({
+      data: {
+        employeeId,
+        leaveType,
+        leaveDate,
+        unitsMinutes,
+        reason: body.reason?.trim() || null,
+      },
+      select: leaveRequestSelect,
+    });
+    await tx.approvalAudit.create({
+      data: {
+        employeeId,
+        requestKind: "leave",
+        requestId: created.id,
+        action: "SUBMIT",
+        toStatus: "PENDING",
+        actorEmail: authenticatedEmployee.email,
+        actorName: authenticatedEmployee.name,
+        note: body.reason?.trim() || null,
+      },
+    });
+    return created;
   });
 
   // The request remains valid even if chat delivery is temporarily unavailable.
