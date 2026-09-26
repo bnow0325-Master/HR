@@ -32,12 +32,20 @@ export async function GET(request: Request) {
   const employee = email
     ? await prisma.employee.findUnique({
         where: { email },
-        select: { id: true, active: true },
+        select: { id: true, active: true, workboardEnabled: true },
       })
     : null;
-  const employeeId = employee?.active ? employee.id : null;
+  const employeeId = employee?.active && employee.workboardEnabled ? employee.id : null;
+  const representativeEmail = process.env.APPROVAL_CEO_EMAIL?.trim().toLowerCase() || "elon.choo@bnow.co.kr";
+  const isCeo = Boolean(employeeId) && email === representativeEmail;
 
-  const [leaveCount, businessTripCount, submittedLeaveCount, submittedBusinessTripCount] = await Promise.all([
+  const [generalCount, submittedGeneralCount, leaveCount, businessTripCount, submittedLeaveCount, submittedBusinessTripCount] = await Promise.all([
+    prisma.approvalDocument.count({
+      where: { status: "PENDING", approverEmail: representativeEmail },
+    }),
+    employeeId
+      ? prisma.approvalDocument.count({ where: { requesterId: employeeId, status: "PENDING" } })
+      : Promise.resolve(0),
     prisma.leaveRequest.count({ where: { status: "PENDING" } }),
     prisma.businessTrip.count({ where: { status: "PENDING" } }),
     employeeId
@@ -50,14 +58,16 @@ export async function GET(request: Request) {
 
   return NextResponse.json(
     {
-      pendingCount: leaveCount + businessTripCount,
+      mode: isCeo ? "review" : "submitted",
+      pendingCount: isCeo ? generalCount : submittedGeneralCount,
+      generalCount,
       leaveCount,
       businessTripCount,
-      submittedPendingCount: submittedLeaveCount + submittedBusinessTripCount,
+      submittedPendingCount: submittedGeneralCount,
+      submittedGeneralCount,
       submittedLeaveCount,
       submittedBusinessTripCount,
-      approvalUrl: "/admin/approvals",
-      submittedApprovalUrl: "/leave",
+      approvalUrl: "/approvals/",
     },
     { headers: responseHeaders() },
   );

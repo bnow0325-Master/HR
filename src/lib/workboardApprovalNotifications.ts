@@ -16,6 +16,12 @@ type ApprovalDecisionNotification = ApprovalNotification & {
   reviewerNote: string | null;
 };
 
+const pausedWebhookRecipients = new Set(["손근혁", "박관식"]);
+
+function webhookRecipientPaused(name: string | null | undefined) {
+  return Boolean(name && pausedWebhookRecipients.has(name.trim()));
+}
+
 function configuredWebhook() {
   const url = process.env.WORKBOARD_STAFF_CHAT_WEBHOOK_URL?.trim();
   const token = process.env.WORKBOARD_STAFF_CHAT_WEBHOOK_TOKEN?.trim();
@@ -57,11 +63,11 @@ export async function notifyAdminsAboutApprovalRequest(
       workboardEnabled: true,
       email: { not: null },
     },
-    select: { email: true },
+    select: { name: true, email: true },
   });
 
     const recipientEmails = admins.flatMap((admin) =>
-    admin.email?.trim() ? [admin.email.trim()] : [],
+    !webhookRecipientPaused(admin.name) && admin.email?.trim() ? [admin.email.trim()] : [],
   );
     if (recipientEmails.length === 0) {
     console.warn("HR approval notification skipped: no active WorkBoard administrator found.");
@@ -89,6 +95,7 @@ export async function notifyAdminsAboutApprovalRequest(
             title: `${kindLabel} 승인 요청`,
             message: `${notification.employeeName}(${notification.employeeCode})님이 ${notification.description} 신청했습니다. 인사관리에서 승인 또는 반려해 주세요.`,
             pageUrl,
+            audience: "work",
             type: "confirm_request",
           }),
           signal: controller.signal,
@@ -119,6 +126,7 @@ export async function notifyEmployeeAboutApprovalDecision(
   notification: ApprovalDecisionNotification,
 ) {
   try {
+    if (webhookRecipientPaused(notification.employeeName)) return;
     const webhook = configuredWebhook();
     const recipientEmail = notification.employeeEmail?.trim();
     if (!webhook || !recipientEmail) return;
@@ -129,6 +137,64 @@ export async function notifyEmployeeAboutApprovalDecision(
     const note = notification.reviewerNote
       ? `\n결재 메모: ${notification.reviewerNote}`
       : "";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const origin = (process.env.HR_PUBLIC_ORIGIN?.trim() || "https://hr.bnow.co.kr").replace(/\/$/, "");
+      const requestPath = notification.kind === "leave" ? "/leave" : "/business-trips";
+      const response = await fetch(webhook.url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${webhook.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          idempotencyKey: `hr-decision-${notification.kind}-${notification.requestId}-${notification.decision}`,
+          recipientEmail,
+          senderName: "BNOW 인사관리",
+          title: `${kindLabel} ${resultLabel}`,
+          message: `신청하신 ${notification.description} ${kindLabel}가 ${decisionLabel}되었습니다.${note}`,
+          pageUrl: `${origin}${requestPath}`,
+          audience: "work",
+          type: "confirm_request",
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        console.warn("HR approval decision notification could not be delivered.");
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch {
+    console.warn("HR approval decision notification could not be sent.");
+  }
+}
+
+type GeneralApprovalNotification = {
+  documentId: string;
+  documentNo: string;
+  title: string;
+  templateName: string;
+  requesterEmail: string;
+  requesterName: string;
+};
+
+async function sendGeneralApprovalMessage(input: {
+  idempotencyKey: string;
+  recipientEmail: string;
+  recipientName?: string;
+  title: string;
+  message: string;
+  documentId: string;
+}) {
+  if (webhookRecipientPaused(input.recipientName)) return;
+  const webhook = configuredWebhook();
+  if (!webhook) return;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const origin = (process.env.WORKBOARD_ORIGIN?.trim() || "https://main.bnow.co.kr").replace(/\/$/, "");
     const response = await fetch(webhook.url, {
       method: "POST",
       headers: {
@@ -136,20 +202,53 @@ export async function notifyEmployeeAboutApprovalDecision(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        idempotencyKey: `hr-decision-${notification.kind}-${notification.requestId}-${notification.decision}`,
-        recipientEmail,
-        senderName: "BNOW 인사관리",
-        title: `${kindLabel} ${resultLabel}`,
-        message: `신청하신 ${notification.description} ${kindLabel}가 ${decisionLabel}되었습니다.${note}`,
-        pageUrl: `${(process.env.HR_PUBLIC_ORIGIN?.trim() || "https://hr.bnow.co.kr").replace(/\/$/, "")}/${notification.kind === "leave" ? "leave" : "business-trips"}`,
+        idempotencyKey: input.idempotencyKey,
+        recipientEmail: input.recipientEmail,
+        senderName: "BNOW 결재",
+        title: input.title,
+        message: input.message,
+        pageUrl: `${origin}/approvals/?focus=${encodeURIComponent(input.documentId)}`,
         audience: "work",
         type: "confirm_request",
       }),
+      signal: controller.signal,
     });
-    if (!response.ok) {
-      console.warn("HR approval decision notification could not be delivered.");
-    }
+    if (!response.ok) throw new Error(`WorkBoard webhook returned ${response.status}`);
   } catch {
-    console.warn("HR approval decision notification could not be sent.");
+    console.warn("WorkBoard general approval notification could not be sent.");
+  } finally {
+    clearTimeout(timeout);
   }
+}
+
+export async function notifyCeoAboutApprovalDocument(
+  notification: GeneralApprovalNotification,
+) {
+  const recipientEmail = process.env.APPROVAL_CEO_EMAIL?.trim().toLowerCase()
+    || "elon.choo@bnow.co.kr";
+  await sendGeneralApprovalMessage({
+    idempotencyKey: `approval-submit-${notification.documentId}`,
+    recipientEmail,
+    title: `${notification.templateName} 결재 요청`,
+    message: `${notification.requesterName}님이 ${notification.title} 문서를 대표이사 결재로 상신했습니다. (${notification.documentNo})`,
+    documentId: notification.documentId,
+  });
+}
+
+export async function notifyRequesterAboutApprovalDocument(
+  notification: GeneralApprovalNotification & {
+    decision: "APPROVED" | "REJECTED";
+    decisionNote: string | null;
+  },
+) {
+  const decisionLabel = notification.decision === "APPROVED" ? "승인" : "반려";
+  const note = notification.decisionNote ? `\n결재 의견: ${notification.decisionNote}` : "";
+  await sendGeneralApprovalMessage({
+    idempotencyKey: `approval-decision-${notification.documentId}-${notification.decision}`,
+    recipientEmail: notification.requesterEmail,
+    recipientName: notification.requesterName,
+    title: `${notification.templateName} ${decisionLabel}`,
+    message: `${notification.title} 문서가 대표이사 ${decisionLabel} 처리되었습니다. (${notification.documentNo})${note}`,
+    documentId: notification.documentId,
+  });
 }

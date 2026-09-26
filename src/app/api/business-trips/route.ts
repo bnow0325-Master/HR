@@ -136,14 +136,29 @@ export async function POST(req: Request) {
     );
   }
 
-  const trip = await prisma.businessTrip.create({
-    data: {
-      employeeId,
-      startDate,
-      endDate,
-      reason,
-    },
-    select: businessTripSelect,
+  const trip = await prisma.$transaction(async (tx) => {
+    const created = await tx.businessTrip.create({
+      data: {
+        employeeId,
+        startDate,
+        endDate,
+        reason,
+      },
+      select: businessTripSelect,
+    });
+    await tx.approvalAudit.create({
+      data: {
+        employeeId,
+        requestKind: "business-trip",
+        requestId: created.id,
+        action: "SUBMIT",
+        toStatus: "PENDING",
+        actorEmail: authenticatedEmployee.email,
+        actorName: authenticatedEmployee.name,
+        note: reason,
+      },
+    });
+    return created;
   });
 
   const employeeDetails = await prisma.employee.findUnique({
