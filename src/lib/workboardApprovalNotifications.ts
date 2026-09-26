@@ -194,7 +194,7 @@ async function sendGeneralApprovalMessage(input: {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const origin = (process.env.WORKBOARD_ORIGIN?.trim() || "https://main.bnow.co.kr").replace(/\/$/, "");
+    const origin = (process.env.APPROVAL_ORIGIN?.trim() || "https://approval.bnow.co.kr").replace(/\/$/, "");
     const response = await fetch(webhook.url, {
       method: "POST",
       headers: {
@@ -207,7 +207,7 @@ async function sendGeneralApprovalMessage(input: {
         senderName: "BNOW 결재",
         title: input.title,
         message: input.message,
-        pageUrl: `${origin}/approvals/?focus=${encodeURIComponent(input.documentId)}`,
+        pageUrl: `${origin}/?focus=${encodeURIComponent(input.documentId)}`,
         audience: "work",
         type: "confirm_request",
       }),
