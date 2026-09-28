@@ -58,31 +58,68 @@ async function buildSummary(employeeId: string) {
 
   const asOf = new Date();
   const period = currentLeavePeriod(employee.hireDate, asOf);
-  const requests = await prisma.leaveRequest.findMany({
-    where: {
-      employeeId,
-      leaveDate: { gte: period.start, lt: period.end },
-    },
-    select: leaveRequestSelect,
-    orderBy: [{ leaveDate: "desc" }, { createdAt: "desc" }],
-  });
+  const [requests, sourceBalance, sourceHistory] = await prisma.$transaction([
+    prisma.leaveRequest.findMany({
+      where: {
+        employeeId,
+        leaveDate: { gte: period.start, lt: period.end },
+      },
+      select: leaveRequestSelect,
+      orderBy: [{ leaveDate: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.naverWorksAnnualLeaveBalance.findFirst({
+      where: {
+        employeeId,
+        cycleStart: { lte: asOf },
+        cycleEnd: { gte: asOf },
+      },
+      orderBy: [{ sourceAsOf: "desc" }, { importedAt: "desc" }],
+    }),
+    prisma.naverWorksAbsenceRecord.findMany({
+      where: {
+        employeeId,
+        absenceType: { contains: "연차" },
+        requestedOn: { gte: period.start, lt: period.end },
+      },
+      select: {
+        id: true,
+        absenceType: true,
+        unitsMinutes: true,
+        periodText: true,
+        requestedOn: true,
+        status: true,
+      },
+      orderBy: [{ requestedOn: "desc" }, { importedAt: "desc" }],
+    }),
+  ]);
 
-  const grantedDays = statutoryAnnualLeaveDays(employee.hireDate, asOf);
+  const importedAt = sourceBalance?.sourceAsOf;
+  // Requests created before the imported ledger are already included in the
+  // NAVER WORKS balance. Only later local approvals must be subtracted again.
   const approvedMinutes = requests
-    .filter((request) => request.status === "APPROVED")
+    .filter((request) => request.status === "APPROVED" && (!importedAt || request.createdAt > importedAt))
     .reduce((sum, request) => sum + request.unitsMinutes, 0);
   const pendingMinutes = requests
     .filter((request) => request.status === "PENDING")
     .reduce((sum, request) => sum + request.unitsMinutes, 0);
-  const grantedMinutes = grantedDays * employee.workMinutesPerDay;
+  const statutoryGrantedDays = statutoryAnnualLeaveDays(employee.hireDate, asOf);
+  const sourceGrantedMinutes = sourceBalance
+    ? sourceBalance.annualGrantedMinutes
+      + sourceBalance.firstYearGrantedMinutes
+      + sourceBalance.firstYearCarryoverMinutes
+      + sourceBalance.carryoverMinutes
+      + sourceBalance.adjustedMinutes
+    : null;
+  const grantedMinutes = sourceGrantedMinutes ?? statutoryGrantedDays * employee.workMinutesPerDay;
+  const sourceRemainingMinutes = sourceBalance?.remainingMinutes ?? grantedMinutes - approvedMinutes;
 
   return {
     employee,
     requests,
     summary: {
-      grantedDays,
+      grantedDays: minutesToDays(grantedMinutes, employee.workMinutesPerDay),
       usedDays: minutesToDays(
-        approvedMinutes,
+        (sourceBalance?.usedMinutes ?? 0) + approvedMinutes,
         employee.workMinutesPerDay,
       ),
       pendingDays: minutesToDays(
@@ -90,12 +127,18 @@ async function buildSummary(employeeId: string) {
         employee.workMinutesPerDay,
       ),
       remainingDays: minutesToDays(
-        Math.max(0, grantedMinutes - approvedMinutes - pendingMinutes),
+        sourceRemainingMinutes - approvedMinutes - pendingMinutes,
         employee.workMinutesPerDay,
       ),
       periodStart: period.start,
       periodEnd: period.end,
     },
+    sourceBalance: sourceBalance && {
+      provider: "NAVER_WORKS",
+      sourceAsOf: sourceBalance.sourceAsOf,
+      importedAt: sourceBalance.importedAt,
+    },
+    naverWorksHistory: sourceHistory,
   };
 }
 

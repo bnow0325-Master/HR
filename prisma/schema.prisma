@@ -41,6 +41,7 @@ model Employee {
   approvalDocuments        ApprovalDocument[]
   naverWorksDailyRecords   NaverWorksDailyRecord[]
   naverWorksAbsenceRecords NaverWorksAbsenceRecord[]
+  naverWorksAnnualLeaveBalances NaverWorksAnnualLeaveBalance[]
 
   @@index([active, code])
 }
@@ -96,6 +97,35 @@ model NaverWorksAbsenceRecord {
 
   @@index([employeeId, requestedOn])
   @@index([absenceType, requestedOn])
+}
+
+// Snapshot exported from NAVER WORKS' annual-leave ledger. Keeping the source
+// values intact preserves carryovers and manual adjustments made before HR cutover.
+model NaverWorksAnnualLeaveBalance {
+  id                       String   @id @default(cuid())
+  employee                 Employee @relation(fields: [employeeId], references: [id])
+  employeeId               String
+  sourceYear               Int
+  sourceGroup              String?
+  sourceLoginId            String?
+  sourceDepartment         String?
+  cycleStart               DateTime @db.Date
+  cycleEnd                 DateTime @db.Date
+  annualGrantedMinutes     Int      @default(0)
+  firstYearGrantedMinutes  Int      @default(0)
+  firstYearCarryoverMinutes Int     @default(0)
+  carryoverMinutes         Int      @default(0)
+  usedMinutes              Int      @default(0)
+  adjustedMinutes          Int      @default(0)
+  remainingMinutes         Int      @default(0)
+  sourceAsOf               DateTime @db.Date
+  sourceRow                Int
+  importedAt               DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([employeeId, sourceYear, cycleStart])
+  @@index([employeeId, cycleStart, cycleEnd])
+  @@index([sourceYear])
 }
 
 model AttendanceRecord {
