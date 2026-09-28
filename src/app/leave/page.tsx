@@ -40,6 +40,21 @@ type LeaveSummary = {
   periodEnd: string;
 };
 
+type NaverWorksLeaveHistory = {
+  id: string;
+  absenceType: string;
+  unitsMinutes: number;
+  periodText: string;
+  requestedOn: string | null;
+  status: string;
+};
+
+type SourceBalance = {
+  provider: "NAVER_WORKS";
+  sourceAsOf: string;
+  importedAt: string;
+};
+
 const DEVELOPMENT_EMPLOYEES_KEY = "checkinoutDevelopmentEmployees";
 const DEVELOPMENT_LEAVE_REQUESTS_KEY =
   "checkinoutDevelopmentLeaveRequests";
@@ -158,6 +173,8 @@ export default function LeavePage() {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [summary, setSummary] = useState<LeaveSummary | null>(null);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [naverWorksHistory, setNaverWorksHistory] = useState<NaverWorksLeaveHistory[]>([]);
+  const [sourceBalance, setSourceBalance] = useState<SourceBalance | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{
     ok: boolean;
@@ -189,6 +206,8 @@ export default function LeavePage() {
       setEmployee(matched);
       setRequests(result?.requests ?? []);
       setSummary(result?.summary ?? null);
+      setNaverWorksHistory([]);
+      setSourceBalance(null);
       setLoading(false);
       return;
     }
@@ -205,6 +224,8 @@ export default function LeavePage() {
       setEmployee(data.employee);
       setSummary(data.summary);
       setRequests(data.requests);
+      setNaverWorksHistory(data.naverWorksHistory ?? []);
+      setSourceBalance(data.sourceBalance ?? null);
     } catch {
       setMessage({ ok: false, text: "휴가 정보를 불러오지 못했습니다." });
     } finally {
@@ -371,6 +392,12 @@ export default function LeavePage() {
             />
           </section>
 
+          {sourceBalance && (
+            <p className="-mt-3 mb-6 text-sm text-slate-500">
+              네이버웍스 연차 원장 기준으로 동기화되었습니다. 기준일 {formatDate(sourceBalance.sourceAsOf)}
+            </p>
+          )}
+
           <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
             <form
               onSubmit={submitRequest}
@@ -460,6 +487,32 @@ export default function LeavePage() {
               )}
             </section>
           </div>
+
+          {naverWorksHistory.length > 0 && (
+            <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <h2 className="text-xl font-bold text-slate-900">네이버웍스 이전 사용 내역</h2>
+                <p className="mt-1 text-sm text-slate-500">기존 네이버웍스에서 승인된 연차 기록입니다.</p>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {naverWorksHistory.map((record) => (
+                  <div key={record.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                    <div>
+                      <div className="font-semibold text-slate-800">
+                        {record.periodText} · {record.absenceType}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-500">
+                        {record.requestedOn ? `신청일 ${formatDate(record.requestedOn)}` : "신청일 미기록"}
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {minutesToDays(record.unitsMinutes, employee?.workMinutesPerDay ?? 480)}일
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-20 text-center text-slate-400">
