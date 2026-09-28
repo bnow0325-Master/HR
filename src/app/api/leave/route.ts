@@ -145,6 +145,34 @@ async function buildSummary(employeeId: string) {
       provider: "NAVER_WORKS",
       sourceAsOf: sourceBalance.sourceAsOf,
       importedAt: sourceBalance.importedAt,
+      annualGrantedDays: minutesToDays(
+        sourceBalance.annualGrantedMinutes,
+        employee.workMinutesPerDay,
+      ),
+      firstYearGrantedDays: minutesToDays(
+        sourceBalance.firstYearGrantedMinutes,
+        employee.workMinutesPerDay,
+      ),
+      firstYearCarryoverDays: minutesToDays(
+        sourceBalance.firstYearCarryoverMinutes,
+        employee.workMinutesPerDay,
+      ),
+      carryoverDays: minutesToDays(
+        sourceBalance.carryoverMinutes,
+        employee.workMinutesPerDay,
+      ),
+      adjustedDays: minutesToDays(
+        sourceBalance.adjustedMinutes,
+        employee.workMinutesPerDay,
+      ),
+      usedDays: minutesToDays(
+        sourceBalance.usedMinutes,
+        employee.workMinutesPerDay,
+      ),
+      remainingDays: minutesToDays(
+        sourceBalance.remainingMinutes,
+        employee.workMinutesPerDay,
+      ),
     },
     naverWorksHistory: sourceHistory,
   };

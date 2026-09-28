@@ -53,6 +53,13 @@ type SourceBalance = {
   provider: "NAVER_WORKS";
   sourceAsOf: string;
   importedAt: string;
+  annualGrantedDays: number;
+  firstYearGrantedDays: number;
+  firstYearCarryoverDays: number;
+  carryoverDays: number;
+  adjustedDays: number;
+  usedDays: number;
+  remainingDays: number;
 };
 
 const DEVELOPMENT_EMPLOYEES_KEY = "checkinoutDevelopmentEmployees";
@@ -393,9 +400,25 @@ export default function LeavePage() {
           </section>
 
           {sourceBalance && (
-            <p className="-mt-3 mb-6 text-sm text-slate-500">
-              네이버웍스 연차 원장 기준으로 동기화되었습니다. 기준일 {formatDate(sourceBalance.sourceAsOf)}
-            </p>
+            <section className="mb-6 overflow-hidden rounded-2xl border border-blue-100 bg-blue-50/40">
+              <div className="border-b border-blue-100 bg-white/70 px-5 py-4">
+                <h2 className="text-lg font-bold text-slate-900">네이버웍스 연차 원장</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  기준일 {formatDate(sourceBalance.sourceAsOf)} · 원본 발생, 사용, 잔여 수치를 그대로 표시합니다.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-px bg-blue-100 sm:grid-cols-3">
+                <LedgerValue label="연차 발생" value={sourceBalance.annualGrantedDays} />
+                <LedgerValue label="사용 일수" value={sourceBalance.usedDays} />
+                <LedgerValue label="잔여 일수" value={sourceBalance.remainingDays} emphasis />
+              </div>
+              <div className="grid grid-cols-2 gap-px border-t border-blue-100 bg-blue-100 md:grid-cols-4">
+                <LedgerValue label="1년 미만 발생" value={sourceBalance.firstYearGrantedDays} compact />
+                <LedgerValue label="1년 미만 이월" value={sourceBalance.firstYearCarryoverDays} compact />
+                <LedgerValue label="이월 일수" value={sourceBalance.carryoverDays} compact />
+                <LedgerValue label="연차 조정" value={sourceBalance.adjustedDays} compact />
+              </div>
+            </section>
           )}
 
           <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
@@ -562,6 +585,27 @@ function SummaryCard({
       <div className="mt-2 text-3xl font-bold">
         {value}
         <span className="ml-1 text-base font-medium">일</span>
+      </div>
+    </div>
+  );
+}
+
+function LedgerValue({
+  label,
+  value,
+  compact = false,
+  emphasis = false,
+}: {
+  label: string;
+  value: number;
+  compact?: boolean;
+  emphasis?: boolean;
+}) {
+  return (
+    <div className={`bg-white px-5 ${compact ? "py-3" : "py-5"}`}>
+      <div className="text-sm font-medium text-slate-500">{label}</div>
+      <div className={`mt-1 font-bold ${compact ? "text-xl" : "text-3xl"} ${emphasis ? "text-brand" : "text-slate-900"}`}>
+        {value}일
       </div>
     </div>
   );
