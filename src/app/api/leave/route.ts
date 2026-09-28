@@ -15,6 +15,12 @@ type LeaveBody = {
   reason?: string;
 };
 
+function naverWorksLeaveCutoverDate() {
+  return startOfKstDate(
+    process.env.NAVER_WORKS_LEAVE_CUTOVER_DATE ?? "",
+  );
+}
+
 const leaveRequestSelect = {
   id: true,
   leaveType: true,
@@ -93,14 +99,16 @@ async function buildSummary(employeeId: string) {
     }),
   ]);
 
-  const importedAt = sourceBalance?.sourceAsOf;
-  // Requests created before the imported ledger are already included in the
-  // NAVER WORKS balance. Only later local approvals must be subtracted again.
+  const cutoverDate = naverWorksLeaveCutoverDate();
+  // Until the HR cutover, NAVER WORKS remains the source of truth. Ignoring
+  // earlier HR test requests prevents their approved days being deducted twice.
+  const isPostCutoverRequest = (request: { createdAt: Date }) =>
+    !sourceBalance || !cutoverDate || request.createdAt >= cutoverDate;
   const approvedMinutes = requests
-    .filter((request) => request.status === "APPROVED" && (!importedAt || request.createdAt > importedAt))
+    .filter((request) => request.status === "APPROVED" && isPostCutoverRequest(request))
     .reduce((sum, request) => sum + request.unitsMinutes, 0);
   const pendingMinutes = requests
-    .filter((request) => request.status === "PENDING")
+    .filter((request) => request.status === "PENDING" && isPostCutoverRequest(request))
     .reduce((sum, request) => sum + request.unitsMinutes, 0);
   const statutoryGrantedDays = statutoryAnnualLeaveDays(employee.hireDate, asOf);
   const sourceGrantedMinutes = sourceBalance
