@@ -37,9 +37,9 @@ function configuredWebhook() {
 }
 
 function approvalPageUrl(kind: ApprovalRequestKind, requestId: string) {
-  const origin = (process.env.HR_PUBLIC_ORIGIN?.trim() || "https://hr.bnow.co.kr")
+  const origin = (process.env.APPROVAL_ORIGIN?.trim() || "https://approval.bnow.co.kr")
     .replace(/\/$/, "");
-  return `${origin}/admin/approvals?focus=${kind}:${encodeURIComponent(requestId)}`;
+  return `${origin}/?focus=${encodeURIComponent(`${kind}:${requestId}`)}`;
 }
 
 /**
@@ -56,19 +56,22 @@ export async function notifyAdminsAboutApprovalRequest(
       return;
     }
 
-    const admins = await prisma.employee.findMany({
+    const representativeEmail = process.env.APPROVAL_CEO_EMAIL?.trim().toLowerCase()
+      || "elon.choo@bnow.co.kr";
+    const representative = await prisma.employee.findFirst({
     where: {
       active: true,
-      systemRole: "ADMIN",
       workboardEnabled: true,
-      email: { not: null },
+      email: representativeEmail,
     },
     select: { name: true, email: true },
   });
 
-    const recipientEmails = admins.flatMap((admin) =>
-    !webhookRecipientPaused(admin.name) && admin.email?.trim() ? [admin.email.trim()] : [],
-  );
+    const recipientEmails = representative
+      && !webhookRecipientPaused(representative.name)
+      && representative.email?.trim()
+      ? [representative.email.trim()]
+      : [];
     if (recipientEmails.length === 0) {
     console.warn("HR approval notification skipped: no active WorkBoard administrator found.");
     return;
@@ -140,8 +143,6 @@ export async function notifyEmployeeAboutApprovalDecision(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
     try {
-      const origin = (process.env.HR_PUBLIC_ORIGIN?.trim() || "https://hr.bnow.co.kr").replace(/\/$/, "");
-      const requestPath = notification.kind === "leave" ? "/leave" : "/business-trips";
       const response = await fetch(webhook.url, {
         method: "POST",
         headers: {
@@ -154,7 +155,7 @@ export async function notifyEmployeeAboutApprovalDecision(
           senderName: "BNOW 인사관리",
           title: `${kindLabel} ${resultLabel}`,
           message: `신청하신 ${notification.description} ${kindLabel}가 ${decisionLabel}되었습니다.${note}`,
-          pageUrl: `${origin}${requestPath}`,
+          pageUrl: approvalPageUrl(notification.kind, notification.requestId),
           audience: "work",
           type: "confirm_request",
         }),
