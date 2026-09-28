@@ -19,9 +19,9 @@ CREATE TABLE `NaverWorksAnnualLeaveBalance` (
     `importedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `NaverWorksAnnualLeaveBalance_employeeId_sourceYear_cycleStart_key`(`employeeId`, `sourceYear`, `cycleStart`),
-    INDEX `NaverWorksAnnualLeaveBalance_employeeId_cycleStart_cycleEnd_idx`(`employeeId`, `cycleStart`, `cycleEnd`),
-    INDEX `NaverWorksAnnualLeaveBalance_sourceYear_idx`(`sourceYear`),
+    UNIQUE INDEX `Nwab_employee_year_cycle_uq`(`employeeId`, `sourceYear`, `cycleStart`),
+    INDEX `Nwab_employee_cycle_idx`(`employeeId`, `cycleStart`, `cycleEnd`),
+    INDEX `Nwab_year_idx`(`sourceYear`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
