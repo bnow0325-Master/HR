@@ -59,7 +59,9 @@ export async function GET(request: Request) {
   return NextResponse.json(
     {
       mode: isCeo ? "review" : "submitted",
-      pendingCount: isCeo ? generalCount : submittedGeneralCount,
+      pendingCount: isCeo
+        ? generalCount + leaveCount + businessTripCount
+        : submittedGeneralCount + submittedLeaveCount + submittedBusinessTripCount,
       generalCount,
       leaveCount,
       businessTripCount,

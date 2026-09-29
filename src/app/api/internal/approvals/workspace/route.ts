@@ -7,6 +7,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import {
   notifyCeoAboutApprovalDocument,
+  notifyEmployeeAboutApprovalDecision,
   notifyRequesterAboutApprovalDocument,
 } from "@/lib/workboardApprovalNotifications";
 
@@ -19,10 +20,12 @@ type ApprovalField = {
   required: boolean;
 };
 
+type ApprovalSourceKind = "general" | "leave" | "business-trip";
+
 type ApprovalAction =
   | { action: "submit"; templateId: string; title: string; values: Record<string, string | number> }
-  | { action: "decide"; documentId: string; version: number; decision: "APPROVED" | "REJECTED"; note: string }
-  | { action: "withdraw"; documentId: string; version: number; note: string }
+  | { action: "decide"; sourceKind: ApprovalSourceKind; documentId: string; version: number; decision: "APPROVED" | "REJECTED"; note: string }
+  | { action: "withdraw"; sourceKind: ApprovalSourceKind; documentId: string; version: number; note: string }
   | { action: "save-template"; templateId?: string; name: string; description: string; fields: ApprovalField[]; active: boolean };
 
 type EmployeeIdentity = {
@@ -79,10 +82,13 @@ function parseAction(value: unknown): ApprovalAction | null {
     const documentId = shortText(body.documentId, 191);
     const version = typeof body.version === "number" && Number.isInteger(body.version) && body.version > 0 ? body.version : null;
     const note = typeof body.note === "string" ? body.note.trim().slice(0, 1000) : "";
+    const sourceKind = body.sourceKind === "leave" || body.sourceKind === "business-trip"
+      ? body.sourceKind
+      : "general";
     if (!documentId || !version) return null;
-    if (body.action === "withdraw") return { action: "withdraw", documentId, version, note };
+    if (body.action === "withdraw") return { action: "withdraw", sourceKind, documentId, version, note };
     if (body.decision !== "APPROVED" && body.decision !== "REJECTED") return null;
-    return { action: "decide", documentId, version, decision: body.decision, note };
+    return { action: "decide", sourceKind, documentId, version, decision: body.decision, note };
   }
   if (body.action === "save-template") {
     const name = shortText(body.name, 80);
@@ -120,6 +126,28 @@ function documentNumber() {
     day: "2-digit",
   }).format(new Date()).replaceAll("-", "");
   return `APP-${date}-${randomUUID().slice(0, 8).toUpperCase()}`;
+}
+
+function dateValue(value: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+}
+
+function leaveTypeLabel(value: string) {
+  if (value === "ANNUAL") return "연차";
+  if (value === "AM_HALF") return "오전 반차";
+  if (value === "PM_HALF") return "오후 반차";
+  return value;
+}
+
+function minutesLabel(value: number) {
+  if (value > 0 && value % 480 === 0) return `${value / 480}일`;
+  if (value > 0 && value % 60 === 0) return `${value / 60}시간`;
+  return `${value}분`;
 }
 
 async function authorizedEmployee(request: Request): Promise<EmployeeIdentityResult> {
@@ -162,7 +190,7 @@ export async function GET(request: Request) {
   const employee = identity.employee;
   const isCeo = employee.email.toLowerCase() === ceoEmail();
 
-  const [ceo, templates, documents] = await Promise.all([
+  const [ceo, templates, documents, leaveRequests, businessTrips] = await Promise.all([
     prisma.employee.findFirst({
       where: { email: ceoEmail(), active: true, workboardEnabled: true },
       select: { name: true, email: true },
@@ -174,26 +202,140 @@ export async function GET(request: Request) {
     }),
     prisma.approvalDocument.findMany({
       where: isCeo
-        ? {
-            OR: [
-              { requesterId: employee.id },
-              { approverEmail: ceoEmail(), status: "PENDING" },
-            ],
-          }
+        ? { approverEmail: ceoEmail() }
         : { requesterId: employee.id },
       include: { events: { orderBy: { createdAt: "asc" } } },
       orderBy: { submittedAt: "desc" },
       take: 300,
     }),
+    prisma.leaveRequest.findMany({
+      where: isCeo
+        ? {}
+        : { employeeId: employee.id },
+      include: { employee: { select: { id: true, code: true, name: true, department: true, email: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 300,
+    }),
+    prisma.businessTrip.findMany({
+      where: isCeo
+        ? {}
+        : { employeeId: employee.id },
+      include: { employee: { select: { id: true, code: true, name: true, department: true, email: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 300,
+    }),
   ]);
 
-  const serialized = documents.map((document) => ({
+  const [leaveAudits, businessTripAudits] = await Promise.all([
+    prisma.approvalAudit.findMany({
+      where: { requestKind: "leave", requestId: { in: leaveRequests.map((request) => request.id) } },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.approvalAudit.findMany({
+      where: { requestKind: "business-trip", requestId: { in: businessTrips.map((trip) => trip.id) } },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+  const leaveEvents = new Map<string, typeof leaveAudits>();
+  const tripEvents = new Map<string, typeof businessTripAudits>();
+  for (const audit of leaveAudits) {
+    leaveEvents.set(audit.requestId, [...(leaveEvents.get(audit.requestId) ?? []), audit]);
+  }
+  for (const audit of businessTripAudits) {
+    tripEvents.set(audit.requestId, [...(tripEvents.get(audit.requestId) ?? []), audit]);
+  }
+  const approver = ceo ?? { name: "대표이사", email: ceoEmail() };
+
+  const serializedGeneral = documents.map((document) => ({
     ...document,
+    sourceKind: "general" as const,
+    sourceId: document.id,
+    decisionNoteRequired: false,
     values: parseJson<Record<string, string | number>>(document.valuesJson, {}),
     fields: approvalFields(parseJson<unknown>(document.templateFieldsJson, [])) ?? [],
     valuesJson: undefined,
     templateFieldsJson: undefined,
   }));
+  const serializedLeave = leaveRequests.map((request) => ({
+    id: `leave:${request.id}`,
+    sourceKind: "leave" as const,
+    sourceId: request.id,
+    documentNo: `LV-${request.id.slice(-8).toUpperCase()}`,
+    templateId: "hr-leave-request",
+    templateName: "휴가 신청",
+    requesterId: request.employee.id,
+    requesterEmail: request.employee.email ?? "",
+    requesterName: request.employee.name,
+    requesterDepartment: request.employee.department,
+    title: `${leaveTypeLabel(request.leaveType)} · ${dateValue(request.leaveDate)}`,
+    values: {
+      leaveType: leaveTypeLabel(request.leaveType),
+      leaveDate: dateValue(request.leaveDate),
+      units: minutesLabel(request.unitsMinutes),
+      reason: request.reason ?? "",
+    },
+    fields: [
+      { key: "leaveType", label: "휴가 종류", type: "text" as const, required: true },
+      { key: "leaveDate", label: "휴가일", type: "date" as const, required: true },
+      { key: "units", label: "사용 단위", type: "text" as const, required: true },
+      { key: "reason", label: "신청 사유", type: "textarea" as const, required: false },
+    ],
+    status: request.status,
+    approverEmail: approver.email,
+    approverName: approver.name,
+    decisionNote: request.reviewerNote,
+    decisionNoteRequired: true,
+    submittedAt: request.createdAt,
+    decidedAt: request.reviewedAt,
+    version: 1,
+    events: (leaveEvents.get(request.id) ?? []).map((event) => ({
+      action: event.action,
+      toStatus: event.toStatus,
+      actorName: event.actorName,
+      note: event.note,
+      createdAt: event.createdAt,
+    })),
+  }));
+  const serializedTrips = businessTrips.map((trip) => ({
+    id: `business-trip:${trip.id}`,
+    sourceKind: "business-trip" as const,
+    sourceId: trip.id,
+    documentNo: `BT-${trip.id.slice(-8).toUpperCase()}`,
+    templateId: "hr-business-trip-request",
+    templateName: "출장 신청",
+    requesterId: trip.employee.id,
+    requesterEmail: trip.employee.email ?? "",
+    requesterName: trip.employee.name,
+    requesterDepartment: trip.employee.department,
+    title: `출장 · ${dateValue(trip.startDate)} ~ ${dateValue(trip.endDate)}`,
+    values: {
+      startDate: dateValue(trip.startDate),
+      endDate: dateValue(trip.endDate),
+      reason: trip.reason,
+    },
+    fields: [
+      { key: "startDate", label: "시작일", type: "date" as const, required: true },
+      { key: "endDate", label: "종료일", type: "date" as const, required: true },
+      { key: "reason", label: "출장 사유", type: "textarea" as const, required: true },
+    ],
+    status: trip.status,
+    approverEmail: approver.email,
+    approverName: approver.name,
+    decisionNote: trip.reviewerNote,
+    decisionNoteRequired: true,
+    submittedAt: trip.createdAt,
+    decidedAt: trip.reviewedAt,
+    version: 1,
+    events: (tripEvents.get(trip.id) ?? []).map((event) => ({
+      action: event.action,
+      toStatus: event.toStatus,
+      actorName: event.actorName,
+      note: event.note,
+      createdAt: event.createdAt,
+    })),
+  }));
+  const serialized = [...serializedGeneral, ...serializedLeave, ...serializedTrips]
+    .sort((left, right) => new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime());
   const pending = serialized.filter((document) => document.status === "PENDING");
 
   return NextResponse.json({
@@ -330,6 +472,9 @@ export async function POST(request: Request) {
   }
 
   if (parsed.action === "withdraw") {
+    if (parsed.sourceKind !== "general") {
+      return NextResponse.json({ error: "휴가·출장 신청 회수는 기존 신청 화면에서 처리해 주세요." }, { status: 400, headers: noStoreHeaders });
+    }
     const document = await prisma.$transaction(async (tx) => {
       const existing = await tx.approvalDocument.findFirst({
         where: { id: parsed.documentId, requesterId: employee.id, status: "PENDING", version: parsed.version },
@@ -358,6 +503,105 @@ export async function POST(request: Request) {
   }
 
   if (!isCeo) return NextResponse.json({ error: "대표이사만 결재할 수 있습니다." }, { status: 403, headers: noStoreHeaders });
+  if (parsed.sourceKind !== "general") {
+    if (!parsed.note) {
+      return NextResponse.json({ error: parsed.decision === "APPROVED" ? "승인 사유를 입력해 주세요." : "반려 사유를 입력해 주세요." }, { status: 400, headers: noStoreHeaders });
+    }
+    const decision = parsed.decision;
+    const action = decision === "APPROVED" ? "APPROVE" : "REJECT";
+    const reviewedAt = new Date();
+    const notification = await prisma.$transaction(async (tx) => {
+      if (parsed.sourceKind === "leave") {
+        const leave = await tx.leaveRequest.findFirst({
+          where: { id: parsed.documentId, status: "PENDING" },
+          include: { employee: { select: { id: true, name: true, code: true, email: true } } },
+        });
+        if (!leave) return null;
+        const updated = await tx.leaveRequest.updateMany({
+          where: { id: leave.id, status: "PENDING" },
+          data: { status: decision, reviewerNote: parsed.note, reviewedAt, reviewedByEmail: employee.email },
+        });
+        if (updated.count !== 1) return null;
+        await tx.approvalAudit.create({
+          data: {
+            employeeId: leave.employee.id,
+            requestKind: "leave",
+            requestId: leave.id,
+            action,
+            fromStatus: "PENDING",
+            toStatus: decision,
+            actorEmail: employee.email,
+            actorName: employee.name,
+            note: parsed.note,
+          },
+        });
+        return {
+          kind: "leave" as const,
+          requestId: leave.id,
+          employeeName: leave.employee.name,
+          employeeCode: leave.employee.code,
+          employeeEmail: leave.employee.email,
+          description: `${dateValue(leave.leaveDate)} ${leaveTypeLabel(leave.leaveType)}`,
+        };
+      }
+
+      const trip = await tx.businessTrip.findFirst({
+        where: { id: parsed.documentId, status: "PENDING" },
+        include: { employee: { select: { id: true, name: true, code: true, email: true } } },
+      });
+      if (!trip) return null;
+      if (decision === "APPROVED") {
+        const overlap = await tx.businessTrip.findFirst({
+          where: {
+            id: { not: trip.id },
+            employeeId: trip.employeeId,
+            status: "APPROVED",
+            startDate: { lte: trip.endDate },
+            endDate: { gte: trip.startDate },
+          },
+          select: { id: true },
+        });
+        if (overlap) throw new Error("APPROVED_TRIP_OVERLAP");
+      }
+      const updated = await tx.businessTrip.updateMany({
+        where: { id: trip.id, status: "PENDING" },
+        data: { status: decision, reviewerNote: parsed.note, reviewedAt, reviewedByEmail: employee.email },
+      });
+      if (updated.count !== 1) return null;
+      await tx.approvalAudit.create({
+        data: {
+          employeeId: trip.employee.id,
+          requestKind: "business-trip",
+          requestId: trip.id,
+          action,
+          fromStatus: "PENDING",
+          toStatus: decision,
+          actorEmail: employee.email,
+          actorName: employee.name,
+          note: parsed.note,
+        },
+      });
+      return {
+        kind: "business-trip" as const,
+        requestId: trip.id,
+        employeeName: trip.employee.name,
+        employeeCode: trip.employee.code,
+        employeeEmail: trip.employee.email,
+        description: `${dateValue(trip.startDate)} ~ ${dateValue(trip.endDate)}`,
+      };
+    }).catch((error: unknown) => {
+      if (error instanceof Error && error.message === "APPROVED_TRIP_OVERLAP") return "overlap" as const;
+      throw error;
+    });
+    if (notification === "overlap") {
+      return NextResponse.json({ error: "확정된 출장 일정과 기간이 겹쳐 승인할 수 없습니다." }, { status: 409, headers: noStoreHeaders });
+    }
+    if (!notification) {
+      return NextResponse.json({ error: "이미 처리되었거나 최신 상태가 아닌 신청입니다." }, { status: 409, headers: noStoreHeaders });
+    }
+    await notifyEmployeeAboutApprovalDecision({ ...notification, decision, reviewerNote: parsed.note });
+    return NextResponse.json({ ok: true }, { headers: noStoreHeaders });
+  }
   if (parsed.decision === "REJECTED" && !parsed.note) {
     return NextResponse.json({ error: "반려 사유를 입력해 주세요." }, { status: 400, headers: noStoreHeaders });
   }

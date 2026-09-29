@@ -22,12 +22,14 @@ const employeeSelect = {
 
 async function currentAdmin() {
   const employee = await getCurrentWorkboardEmployee("any");
-  return employee?.systemRole === "ADMIN" ? employee : null;
+  const representativeEmail = process.env.APPROVAL_CEO_EMAIL?.trim().toLowerCase()
+    || "elon.choo@bnow.co.kr";
+  return employee?.email?.toLowerCase() === representativeEmail ? employee : null;
 }
 
 export async function GET() {
   if (!(await currentAdmin())) {
-    return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
+    return NextResponse.json({ error: "대표이사 권한이 필요합니다." }, { status: 403 });
   }
 
   const [leaveRequests, businessTrips] = await Promise.all([
@@ -61,7 +63,7 @@ export async function PATCH(request: Request) {
 
   const admin = await currentAdmin();
   if (!admin) {
-    return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
+    return NextResponse.json({ error: "대표이사 권한이 필요합니다." }, { status: 403 });
   }
   if (
     !body.requestId || !body.kind || !body.action ||
