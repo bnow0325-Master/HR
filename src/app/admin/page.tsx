@@ -5,6 +5,7 @@ import { isAdmin } from "@/lib/adminAuth";
 import {
   currentLeavePeriod,
   minutesToDays,
+  startOfKstDate,
   statutoryAnnualLeaveDays,
 } from "@/lib/annualLeave";
 import { prisma } from "@/lib/prisma";
@@ -170,6 +171,12 @@ function tripDays(startDate: Date, endDate: Date) {
   return Math.floor((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
 }
 
+function naverWorksLeaveCutoverDate() {
+  return startOfKstDate(
+    process.env.NAVER_WORKS_LEAVE_CUTOVER_DATE ?? "",
+  );
+}
+
 export default async function AdminPage({
   searchParams,
 }: {
@@ -186,7 +193,7 @@ export default async function AdminPage({
   const todayStart = periodRange("today", now).start;
   const today = calendarDateInKst(now);
 
-  const [employees, records, leaveRequests, businessTrips] =
+  const [employees, records, leaveRequests, businessTrips, sourceBalances] =
     await Promise.all([
       prisma.employee.findMany({
         orderBy: { code: "asc" },
@@ -236,7 +243,22 @@ export default async function AdminPage({
         },
         orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
       }),
+      prisma.naverWorksAnnualLeaveBalance.findMany({
+        where: {
+          cycleStart: { lte: now },
+          cycleEnd: { gte: now },
+        },
+        orderBy: [{ sourceAsOf: "desc" }, { importedAt: "desc" }],
+      }),
     ]);
+
+  const sourceBalanceByEmployee = new Map<string, (typeof sourceBalances)[number]>();
+  for (const balance of sourceBalances) {
+    if (!sourceBalanceByEmployee.has(balance.employeeId)) {
+      sourceBalanceByEmployee.set(balance.employeeId, balance);
+    }
+  }
+  const cutoverDate = naverWorksLeaveCutoverDate();
 
   const activeEmployees = employees.filter((employee) => employee.active);
   const todayRecords = records.filter(
@@ -284,28 +306,50 @@ export default async function AdminPage({
     let leave: EmployeeMonitorRow["leave"] = null;
     if (employee.hireDate && employee.leaveEnabled) {
       const leavePeriod = currentLeavePeriod(employee.hireDate, now);
+      const sourceBalance = sourceBalanceByEmployee.get(employee.id);
       const requests = leaveRequests.filter(
         (request) =>
           request.employeeId === employee.id &&
           request.leaveDate >= leavePeriod.start &&
           request.leaveDate < leavePeriod.end,
       );
+      const isPostCutoverRequest = (request: { createdAt: Date }) =>
+        !sourceBalance || !cutoverDate || request.createdAt >= cutoverDate;
       const approvedMinutes = requests
-        .filter((request) => request.status === "APPROVED")
+        .filter(
+          (request) =>
+            request.status === "APPROVED" && isPostCutoverRequest(request),
+        )
         .reduce((sum, request) => sum + request.unitsMinutes, 0);
       const pendingMinutes = requests
-        .filter((request) => request.status === "PENDING")
+        .filter(
+          (request) =>
+            request.status === "PENDING" && isPostCutoverRequest(request),
+        )
         .reduce((sum, request) => sum + request.unitsMinutes, 0);
       const grantedDays = statutoryAnnualLeaveDays(employee.hireDate, now);
       const grantedMinutes = grantedDays * employee.workMinutesPerDay;
+      const sourceGrantedMinutes = sourceBalance
+        ? sourceBalance.annualGrantedMinutes
+          + sourceBalance.firstYearGrantedMinutes
+          + sourceBalance.firstYearCarryoverMinutes
+          + sourceBalance.carryoverMinutes
+          + sourceBalance.adjustedMinutes
+        : null;
+      const remainingMinutes = sourceBalance
+        ? sourceBalance.remainingMinutes - approvedMinutes - pendingMinutes
+        : Math.max(0, grantedMinutes - approvedMinutes - pendingMinutes);
       leave = {
-        grantedDays,
-        usedDays: minutesToDays(approvedMinutes, employee.workMinutesPerDay),
-        pendingDays: minutesToDays(pendingMinutes, employee.workMinutesPerDay),
-        remainingDays: minutesToDays(
-          Math.max(0, grantedMinutes - approvedMinutes - pendingMinutes),
+        grantedDays: minutesToDays(
+          sourceGrantedMinutes ?? grantedMinutes,
           employee.workMinutesPerDay,
         ),
+        usedDays: minutesToDays(
+          (sourceBalance?.usedMinutes ?? 0) + approvedMinutes,
+          employee.workMinutesPerDay,
+        ),
+        pendingDays: minutesToDays(pendingMinutes, employee.workMinutesPerDay),
+        remainingDays: minutesToDays(remainingMinutes, employee.workMinutesPerDay),
       };
     }
 
