@@ -25,6 +25,8 @@ const TABS: { key: Period; label: string }[] = [
   { key: "year", label: "연간" },
 ];
 
+const LEAVE_HISTORY_PAGE_SIZE = 10;
+
 type EmployeeMonitorRow = {
   id: string;
   code: string;
@@ -64,12 +66,14 @@ type AttendanceRow = {
 
 type LeaveTableRow = {
   id: string;
+  source: "HR" | "NAVER_WORKS";
   leaveType: string;
-  leaveDate: Date;
+  periodText: string;
+  searchDate: Date;
   unitsMinutes: number;
   reason: string | null;
   status: string;
-  createdAt: Date;
+  sourceDocumentNo: string | null;
   employee: {
     name: string;
     code: string;
@@ -177,14 +181,52 @@ function naverWorksLeaveCutoverDate() {
   );
 }
 
+function dateParam(value: string | undefined, fallback: Date) {
+  return startOfKstDate(value ?? "") ?? fallback;
+}
+
+function dateInputValue(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function leaveHistoryHref({
+  period,
+  leaveStart,
+  leaveEnd,
+  leavePage,
+}: {
+  period: Period;
+  leaveStart: Date;
+  leaveEnd: Date;
+  leavePage: number;
+}) {
+  const query = new URLSearchParams({
+    period,
+    leaveStart: dateInputValue(leaveStart),
+    leaveEnd: dateInputValue(leaveEnd),
+    leavePage: String(leavePage),
+  });
+  return `/admin?${query.toString()}`;
+}
+
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{
+    period?: string;
+    leaveStart?: string;
+    leaveEnd?: string;
+    leavePage?: string;
+  }>;
 }) {
   if (!(await isAdmin())) redirect("/admin/login");
 
-  const { period: periodParam } = await searchParams;
+  const {
+    period: periodParam,
+    leaveStart: leaveStartParam,
+    leaveEnd: leaveEndParam,
+    leavePage: leavePageParam,
+  } = await searchParams;
   const period: Period = TABS.some((tab) => tab.key === periodParam)
     ? (periodParam as Period)
     : "today";
@@ -192,8 +234,14 @@ export default async function AdminPage({
   const { start, end, label } = periodRange(period, now);
   const todayStart = periodRange("today", now).start;
   const today = calendarDateInKst(now);
+  const earliestLeaveHistoryDate = startOfKstDate("2024-03-25")!;
+  const leaveStart = dateParam(leaveStartParam, earliestLeaveHistoryDate);
+  const requestedLeaveEnd = dateParam(leaveEndParam, today);
+  const leaveEnd = requestedLeaveEnd < leaveStart ? leaveStart : requestedLeaveEnd;
+  const leaveEndExclusive = new Date(leaveEnd.getTime() + 86400000);
+  const requestedLeavePage = Number.parseInt(leavePageParam ?? "1", 10);
 
-  const [employees, records, leaveRequests, businessTrips, sourceBalances] =
+  const [employees, records, leaveRequests, businessTrips, sourceBalances, naverWorksLeaveRecords] =
     await Promise.all([
       prisma.employee.findMany({
         orderBy: { code: "asc" },
@@ -249,6 +297,27 @@ export default async function AdminPage({
           cycleEnd: { gte: now },
         },
         orderBy: [{ sourceAsOf: "desc" }, { importedAt: "desc" }],
+      }),
+      prisma.naverWorksAbsenceRecord.findMany({
+        where: {
+          requestedOn: { gte: leaveStart, lt: leaveEndExclusive },
+          OR: [
+            { absenceType: "연차" },
+            { absenceType: { contains: "휴가" } },
+            { absenceType: { contains: "공가" } },
+          ],
+        },
+        include: {
+          employee: {
+            select: {
+              name: true,
+              code: true,
+              department: true,
+              workMinutesPerDay: true,
+            },
+          },
+        },
+        orderBy: [{ requestedOn: "desc" }, { importedAt: "desc" }],
       }),
     ]);
 
@@ -416,6 +485,49 @@ export default async function AdminPage({
       trip.startDate <= today &&
       trip.endDate >= today,
   ).length;
+  const leaveHistory: LeaveTableRow[] = [
+    ...leaveRequests
+      .filter(
+        (request) =>
+          request.leaveDate >= leaveStart && request.leaveDate < leaveEndExclusive,
+      )
+      .map((request) => ({
+        id: request.id,
+        source: "HR" as const,
+        leaveType: request.leaveType,
+        periodText: fmtDate(request.leaveDate),
+        searchDate: request.leaveDate,
+        unitsMinutes: request.unitsMinutes,
+        reason: request.reason,
+        status: request.status,
+        sourceDocumentNo: null,
+        employee: request.employee,
+      })),
+    ...naverWorksLeaveRecords.map((record) => ({
+      id: record.id,
+      source: "NAVER_WORKS" as const,
+      leaveType: record.absenceType,
+      periodText: record.periodText,
+      searchDate: record.requestedOn!,
+      unitsMinutes: record.unitsMinutes,
+      reason: null,
+      status: record.status,
+      sourceDocumentNo: record.sourceDocumentNo,
+      employee: record.employee,
+    })),
+  ].sort((left, right) => right.searchDate.getTime() - left.searchDate.getTime());
+  const leaveHistoryTotalPages = Math.max(
+    1,
+    Math.ceil(leaveHistory.length / LEAVE_HISTORY_PAGE_SIZE),
+  );
+  const leaveHistoryPage = Math.min(
+    Math.max(1, Number.isFinite(requestedLeavePage) ? requestedLeavePage : 1),
+    leaveHistoryTotalPages,
+  );
+  const pagedLeaveHistory = leaveHistory.slice(
+    (leaveHistoryPage - 1) * LEAVE_HISTORY_PAGE_SIZE,
+    leaveHistoryPage * LEAVE_HISTORY_PAGE_SIZE,
+  );
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -483,15 +595,67 @@ export default async function AdminPage({
         <EmployeeMonitorTable rows={employeeRows} />
       </DashboardSection>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <DashboardSection
-          eyebrow="LEAVE REQUESTS"
-          title="직원별 휴가 신청 현황"
-          description={`전체 ${leaveRequests.length}건 · 신청 중 ${pendingLeaveCount}건`}
-        >
-          <LeaveRequestTable requests={leaveRequests.slice(0, 100)} />
-        </DashboardSection>
+      <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="mb-5">
+          <div className="text-xs font-bold tracking-[0.14em] text-slate-400">
+            LEAVE HISTORY
+          </div>
+          <h2 className="mt-1 text-xl font-bold text-slate-900">
+            직원별 휴가 사용 전체 내역
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            네이버웍스 이전 원장과 HR 휴가 신청을 함께 조회합니다. 총 {leaveHistory.length}건
+          </p>
+        </div>
+        <form className="mb-5 flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-4">
+          <input type="hidden" name="period" value={period} />
+          <label className="text-sm font-medium text-slate-600">
+            시작일
+            <input
+              type="date"
+              name="leaveStart"
+              defaultValue={dateInputValue(leaveStart)}
+              className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800"
+            />
+          </label>
+          <label className="text-sm font-medium text-slate-600">
+            종료일
+            <input
+              type="date"
+              name="leaveEnd"
+              defaultValue={dateInputValue(leaveEnd)}
+              className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"
+          >
+            날짜 검색
+          </button>
+          <Link
+            href={leaveHistoryHref({
+              period,
+              leaveStart: earliestLeaveHistoryDate,
+              leaveEnd: today,
+              leavePage: 1,
+            })}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+          >
+            전체 기간
+          </Link>
+        </form>
+        <LeaveRequestTable
+          requests={pagedLeaveHistory}
+          leaveStart={leaveStart}
+          leaveEnd={leaveEnd}
+          page={leaveHistoryPage}
+          totalPages={leaveHistoryTotalPages}
+          period={period}
+        />
+      </section>
 
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <DashboardSection
           eyebrow="BUSINESS TRIPS"
           title="직원별 출장 신청 현황"
@@ -666,41 +830,96 @@ function EmployeeMonitorTable({ rows }: { rows: EmployeeMonitorRow[] }) {
   );
 }
 
-function LeaveRequestTable({ requests }: { requests: LeaveTableRow[] }) {
-  if (requests.length === 0) return <EmptyState text="휴가 신청 내역이 없습니다." />;
+function LeaveRequestTable({
+  requests,
+  leaveStart,
+  leaveEnd,
+  page,
+  totalPages,
+  period,
+}: {
+  requests: LeaveTableRow[];
+  leaveStart: Date;
+  leaveEnd: Date;
+  page: number;
+  totalPages: number;
+  period: Period;
+}) {
+  if (requests.length === 0) return <EmptyState text="선택한 기간의 휴가 사용 내역이 없습니다." />;
   return (
-    <div className="max-h-[430px] overflow-auto rounded-xl border border-slate-200">
-      <table className="w-full min-w-[620px] text-sm">
+    <>
+      <div className="overflow-auto rounded-xl border border-slate-200">
+      <table className="w-full min-w-[880px] text-sm">
         <thead className="sticky top-0 bg-slate-50 text-left text-xs text-slate-500">
           <tr>
             <th className="px-4 py-3 font-semibold">직원</th>
-            <th className="px-4 py-3 font-semibold">사용일</th>
+            <th className="px-4 py-3 font-semibold">원장</th>
+            <th className="px-4 py-3 font-semibold">사용 일정</th>
+            <th className="px-4 py-3 font-semibold">신청 기준일</th>
             <th className="px-4 py-3 font-semibold">종류</th>
             <th className="px-4 py-3 font-semibold">상태</th>
-            <th className="px-4 py-3 font-semibold">사유</th>
+            <th className="px-4 py-3 font-semibold">사유 / 문서번호</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {requests.map((request) => {
-            const status = leaveStatus(request.status);
+            const status = request.source === "HR"
+              ? leaveStatus(request.status)
+              : { label: "이전 완료", tone: "bg-violet-50 text-violet-700" };
             return (
               <tr key={request.id} className="align-top">
                 <td className="px-4 py-3 font-semibold text-slate-800">
                   {request.employee.name}
                   <div className="text-xs font-normal text-slate-400">{request.employee.department ?? request.employee.code}</div>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(request.leaveDate)}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    request.source === "HR"
+                      ? "bg-blue-50 text-blue-700"
+                      : "bg-violet-50 text-violet-700"
+                  }`}>
+                    {request.source === "HR" ? "HR" : "NAVER WORKS"}
+                  </span>
+                </td>
+                <td className="max-w-[260px] px-4 py-3 text-slate-600">{request.periodText}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtDate(request.searchDate)}</td>
                 <td className="px-4 py-3 whitespace-nowrap text-slate-600">
-                  {leaveTypeLabel(request.leaveType)} · {fmtDays(minutesToDays(request.unitsMinutes, request.employee.workMinutesPerDay))}일
+                  {request.source === "HR"
+                    ? leaveTypeLabel(request.leaveType)
+                    : request.leaveType} · {fmtDays(minutesToDays(request.unitsMinutes, request.employee.workMinutesPerDay))}일
                 </td>
                 <td className="px-4 py-3"><StatusBadge label={status.label} tone={status.tone} /></td>
-                <td className="max-w-[220px] px-4 py-3 text-slate-500">{request.reason || "-"}</td>
+                <td className="max-w-[220px] px-4 py-3 text-slate-500">
+                  {request.reason || request.sourceDocumentNo || "-"}
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
     </div>
+      <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+        <span className="text-slate-500">{page} / {totalPages} 페이지 · 페이지당 {LEAVE_HISTORY_PAGE_SIZE}건</span>
+        <div className="flex gap-2">
+          {page > 1 && (
+            <Link
+              href={leaveHistoryHref({ period, leaveStart, leaveEnd, leavePage: page - 1 })}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              이전
+            </Link>
+          )}
+          {page < totalPages && (
+            <Link
+              href={leaveHistoryHref({ period, leaveStart, leaveEnd, leavePage: page + 1 })}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              다음
+            </Link>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
