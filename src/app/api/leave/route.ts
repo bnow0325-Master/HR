@@ -33,6 +33,58 @@ const leaveRequestSelect = {
   createdAt: true,
 } as const;
 
+function toSourceBalanceDays(
+  balance: {
+    sourceYear: number;
+    cycleStart: Date;
+    cycleEnd: Date;
+    sourceAsOf: Date;
+    importedAt: Date;
+    annualGrantedMinutes: number;
+    firstYearGrantedMinutes: number;
+    firstYearCarryoverMinutes: number;
+    carryoverMinutes: number;
+    adjustedMinutes: number;
+    usedMinutes: number;
+    remainingMinutes: number;
+  },
+  workMinutesPerDay: number,
+) {
+  return {
+    provider: "NAVER_WORKS" as const,
+    sourceYear: balance.sourceYear,
+    cycleStart: balance.cycleStart,
+    cycleEnd: balance.cycleEnd,
+    sourceAsOf: balance.sourceAsOf,
+    importedAt: balance.importedAt,
+    annualGrantedDays: minutesToDays(
+      balance.annualGrantedMinutes,
+      workMinutesPerDay,
+    ),
+    firstYearGrantedDays: minutesToDays(
+      balance.firstYearGrantedMinutes,
+      workMinutesPerDay,
+    ),
+    firstYearCarryoverDays: minutesToDays(
+      balance.firstYearCarryoverMinutes,
+      workMinutesPerDay,
+    ),
+    carryoverDays: minutesToDays(
+      balance.carryoverMinutes,
+      workMinutesPerDay,
+    ),
+    adjustedDays: minutesToDays(
+      balance.adjustedMinutes,
+      workMinutesPerDay,
+    ),
+    usedDays: minutesToDays(balance.usedMinutes, workMinutesPerDay),
+    remainingDays: minutesToDays(
+      balance.remainingMinutes,
+      workMinutesPerDay,
+    ),
+  };
+}
+
 async function getEmployee(employeeId: string) {
   return prisma.employee.findUnique({
     where: { id: employeeId },
@@ -64,7 +116,7 @@ async function buildSummary(employeeId: string) {
 
   const asOf = new Date();
   const period = currentLeavePeriod(employee.hireDate, asOf);
-  const [requests, sourceBalance, sourceHistory] = await prisma.$transaction([
+  const [requests, sourceBalance, sourceLedgerHistory, sourceHistory] = await prisma.$transaction([
     prisma.leaveRequest.findMany({
       where: {
         employeeId,
@@ -80,6 +132,10 @@ async function buildSummary(employeeId: string) {
         cycleEnd: { gte: asOf },
       },
       orderBy: [{ sourceAsOf: "desc" }, { importedAt: "desc" }],
+    }),
+    prisma.naverWorksAnnualLeaveBalance.findMany({
+      where: { employeeId },
+      orderBy: [{ sourceYear: "desc" }, { cycleStart: "desc" }],
     }),
     prisma.naverWorksAbsenceRecord.findMany({
       where: {
@@ -141,39 +197,13 @@ async function buildSummary(employeeId: string) {
       periodStart: period.start,
       periodEnd: period.end,
     },
-    sourceBalance: sourceBalance && {
-      provider: "NAVER_WORKS",
-      sourceAsOf: sourceBalance.sourceAsOf,
-      importedAt: sourceBalance.importedAt,
-      annualGrantedDays: minutesToDays(
-        sourceBalance.annualGrantedMinutes,
-        employee.workMinutesPerDay,
-      ),
-      firstYearGrantedDays: minutesToDays(
-        sourceBalance.firstYearGrantedMinutes,
-        employee.workMinutesPerDay,
-      ),
-      firstYearCarryoverDays: minutesToDays(
-        sourceBalance.firstYearCarryoverMinutes,
-        employee.workMinutesPerDay,
-      ),
-      carryoverDays: minutesToDays(
-        sourceBalance.carryoverMinutes,
-        employee.workMinutesPerDay,
-      ),
-      adjustedDays: minutesToDays(
-        sourceBalance.adjustedMinutes,
-        employee.workMinutesPerDay,
-      ),
-      usedDays: minutesToDays(
-        sourceBalance.usedMinutes,
-        employee.workMinutesPerDay,
-      ),
-      remainingDays: minutesToDays(
-        sourceBalance.remainingMinutes,
-        employee.workMinutesPerDay,
-      ),
-    },
+    sourceBalance: sourceBalance && toSourceBalanceDays(
+      sourceBalance,
+      employee.workMinutesPerDay,
+    ),
+    sourceLedgerHistory: sourceLedgerHistory.map((balance) =>
+      toSourceBalanceDays(balance, employee.workMinutesPerDay),
+    ),
     naverWorksHistory: sourceHistory,
   };
 }

@@ -51,6 +51,9 @@ type NaverWorksLeaveHistory = {
 
 type SourceBalance = {
   provider: "NAVER_WORKS";
+  sourceYear: number;
+  cycleStart: string;
+  cycleEnd: string;
   sourceAsOf: string;
   importedAt: string;
   annualGrantedDays: number;
@@ -182,6 +185,7 @@ export default function LeavePage() {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [naverWorksHistory, setNaverWorksHistory] = useState<NaverWorksLeaveHistory[]>([]);
   const [sourceBalance, setSourceBalance] = useState<SourceBalance | null>(null);
+  const [sourceLedgerHistory, setSourceLedgerHistory] = useState<SourceBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{
     ok: boolean;
@@ -215,6 +219,7 @@ export default function LeavePage() {
       setSummary(result?.summary ?? null);
       setNaverWorksHistory([]);
       setSourceBalance(null);
+      setSourceLedgerHistory([]);
       setLoading(false);
       return;
     }
@@ -233,6 +238,7 @@ export default function LeavePage() {
       setRequests(data.requests);
       setNaverWorksHistory(data.naverWorksHistory ?? []);
       setSourceBalance(data.sourceBalance ?? null);
+      setSourceLedgerHistory(data.sourceLedgerHistory ?? []);
     } catch {
       setMessage({ ok: false, text: "휴가 정보를 불러오지 못했습니다." });
     } finally {
@@ -417,6 +423,43 @@ export default function LeavePage() {
                 <LedgerValue label="1년 미만 이월" value={sourceBalance.firstYearCarryoverDays} compact />
                 <LedgerValue label="이월 일수" value={sourceBalance.carryoverDays} compact />
                 <LedgerValue label="연차 조정" value={sourceBalance.adjustedDays} compact />
+              </div>
+            </section>
+          )}
+
+          {sourceLedgerHistory.length > 0 && (
+            <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <h2 className="text-lg font-bold text-slate-900">연도별 네이버웍스 연차 원장</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  이전 연차기간의 발생, 사용, 잔여 원본 기록입니다.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="px-5 py-3 font-medium">원장 연도</th>
+                      <th className="px-5 py-3 font-medium">연차 기간</th>
+                      <th className="px-5 py-3 text-right font-medium">발생</th>
+                      <th className="px-5 py-3 text-right font-medium">사용</th>
+                      <th className="px-5 py-3 text-right font-medium">잔여</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {sourceLedgerHistory.map((ledger) => (
+                      <tr key={`${ledger.sourceYear}-${ledger.cycleStart}`}>
+                        <td className="px-5 py-3 font-semibold text-slate-900">{ledger.sourceYear}</td>
+                        <td className="whitespace-nowrap px-5 py-3">
+                          {formatDate(ledger.cycleStart)} ~ {formatDate(ledger.cycleEnd)}
+                        </td>
+                        <td className="px-5 py-3 text-right">{ledger.annualGrantedDays + ledger.firstYearGrantedDays + ledger.firstYearCarryoverDays + ledger.carryoverDays + ledger.adjustedDays}일</td>
+                        <td className="px-5 py-3 text-right">{ledger.usedDays}일</td>
+                        <td className="px-5 py-3 text-right font-semibold text-brand">{ledger.remainingDays}일</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
           )}
