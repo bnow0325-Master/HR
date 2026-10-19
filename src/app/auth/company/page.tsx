@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 
-export default function CompanyLoginPage() {
+export default async function CompanyLoginPage() {
+  if (await getCurrentWorkboardEmployee()) redirect("/attendance");
   return (
     <main className="mx-auto flex min-h-[calc(100vh-72px)] max-w-lg items-center px-6 py-12">
       <section className="w-full rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">

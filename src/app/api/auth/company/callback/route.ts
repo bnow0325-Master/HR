@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { companyApplicationUrl, decodeCompanyOidcFlow, exchangeCompanyCode } from "@/lib/companyOidc";
+import { companyApplicationUrl, companyOidcCookieName, decodeCompanyOidcFlowForState, exchangeCompanyCode } from "@/lib/companyOidc";
 import { createWorkboardSessionToken, workboardSessionCookieName, workboardSessionMaxAge } from "@/lib/workboardSession";
 
-function clearOauthCookie(response: NextResponse) {
-  response.cookies.set({ name: "bnow_hr_oauth", value: "", path: "/api/auth/company", maxAge: 0 });
+function clearOauthCookie(response: NextResponse, cookieName: string | null) {
+  if (cookieName) response.cookies.set({ name: cookieName, value: "", path: "/api/auth/company", maxAge: 0 });
   return response;
 }
 
 export async function GET(request: NextRequest) {
+  let cookieName: string | null = null;
   try {
     const code = request.nextUrl.searchParams.get("code") || "";
     const state = request.nextUrl.searchParams.get("state") || "";
-    const flow = decodeCompanyOidcFlow(request.cookies.get("bnow_hr_oauth")?.value || "");
-    if (!code || !flow || flow.state !== state) throw new Error("OIDC callback is invalid.");
+    cookieName = companyOidcCookieName(state);
+    const flow = decodeCompanyOidcFlowForState(state, request.cookies.get(cookieName)?.value || "");
+    if (!code || !flow) throw new Error("OIDC callback is invalid.");
     const identity = await exchangeCompanyCode(flow, code);
     const employee = await prisma.employee.findFirst({
       where: {
@@ -31,8 +33,8 @@ export async function GET(request: NextRequest) {
       httpOnly: true, secure: process.env.NODE_ENV === "production",
       sameSite: "lax", path: "/", maxAge: workboardSessionMaxAge,
     });
-    return clearOauthCookie(response);
+    return clearOauthCookie(response, cookieName);
   } catch {
-    return clearOauthCookie(NextResponse.redirect(companyApplicationUrl("/auth/company?error=access_denied")));
+    return clearOauthCookie(NextResponse.redirect(companyApplicationUrl("/auth/company?error=access_denied")), cookieName);
   }
 }

@@ -86,8 +86,14 @@ export async function getCurrentWorkboardEmployee(
 ) {
   const cookieStore = await cookies();
   const token = cookieStore.get(workboardSessionCookieName)?.value;
-  if (!token) return null;
+  return getWorkboardEmployeeFromToken(token, capability);
+}
 
+export async function getWorkboardEmployeeFromToken(
+  token: string | undefined,
+  capability: EmployeeCapability = "any",
+) {
+  if (!token) return null;
   const session = parseWorkboardSessionToken(token);
   if (!session) return null;
 

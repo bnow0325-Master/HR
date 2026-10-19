@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   companyApplicationUrl,
+  companyOidcCookieName,
   decodeCompanyOidcFlow,
+  decodeCompanyOidcFlowForState,
   encodeCompanyOidcFlow,
   safeCompanyReturnTo,
 } from "./companyOidc";
@@ -53,4 +55,25 @@ test("company OIDC flow rejects an expired signed value", () => {
     issuedAt: Date.now() - 11 * 60 * 1000,
   });
   assert.equal(decodeCompanyOidcFlow(token), null);
+});
+
+test("parallel OIDC logins keep each state, verifier and return path separate", () => {
+  configureOidc();
+  const first = {
+    state: "a".repeat(43), nonce: "first-nonce", verifier: "first-verifier",
+    returnTo: "/leave", issuedAt: Date.now(),
+  };
+  const second = {
+    state: "b".repeat(43), nonce: "second-nonce", verifier: "second-verifier",
+    returnTo: "/records", issuedAt: Date.now(),
+  };
+  const cookies = new Map([
+    [companyOidcCookieName(first.state), encodeCompanyOidcFlow(first)],
+    [companyOidcCookieName(second.state), encodeCompanyOidcFlow(second)],
+  ]);
+  assert.notEqual(companyOidcCookieName(first.state), companyOidcCookieName(second.state));
+  assert.deepEqual(decodeCompanyOidcFlowForState(second.state, cookies.get(companyOidcCookieName(second.state)) ?? ""), second);
+  cookies.delete(companyOidcCookieName(second.state));
+  assert.deepEqual(decodeCompanyOidcFlowForState(first.state, cookies.get(companyOidcCookieName(first.state)) ?? ""), first);
+  assert.equal(decodeCompanyOidcFlowForState(first.state, encodeCompanyOidcFlow(second)), null);
 });
