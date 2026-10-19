@@ -64,6 +64,19 @@ export function safeCompanyReturnTo(value: unknown) {
 }
 
 function randomValue() { return randomBytes(32).toString("base64url"); }
+const OAUTH_COOKIE_PREFIX = "bnow_hr_oauth_";
+
+export function companyOidcCookieName(state: string) {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(state)) throw new Error("OIDC state is invalid.");
+  return OAUTH_COOKIE_PREFIX + state;
+}
+
+export function decodeCompanyOidcFlowForState(state: string, token: string) {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(state)) return null;
+  const flow = decodeCompanyOidcFlow(token);
+  return flow?.state === state ? flow : null;
+}
+
 function signature(config: Configuration, encoded: string) {
   return createHmac("sha256", config.sessionSecret).update(encoded).digest("base64url");
 }
@@ -128,7 +141,7 @@ export async function createCompanyAuthorization(returnTo: unknown) {
     scope: "openid email profile", state: flow.state, nonce: flow.nonce,
     code_challenge: challenge, code_challenge_method: "S256",
   }).toString();
-  return { url: url.toString(), token: encodeCompanyOidcFlow(flow) };
+  return { url: url.toString(), token: encodeCompanyOidcFlow(flow), state: flow.state };
 }
 
 export async function exchangeCompanyCode(flow: CompanyOidcFlow, code: string) {
