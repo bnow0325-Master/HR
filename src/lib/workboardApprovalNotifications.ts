@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-type ApprovalRequestKind = "leave" | "business-trip";
+type ApprovalRequestKind = "leave" | "business-trip" | "attendance-correction";
 
 type ApprovalNotification = {
   kind: ApprovalRequestKind;
@@ -37,6 +37,10 @@ function configuredWebhook() {
 }
 
 function approvalPageUrl(kind: ApprovalRequestKind, requestId: string) {
+  if (kind === "attendance-correction") {
+    const origin = (process.env.HR_PUBLIC_ORIGIN?.trim() || "https://hr.bnow.co.kr").replace(/\/$/, "");
+    return `${origin}/admin/attendance-corrections?focus=${encodeURIComponent(requestId)}`;
+  }
   const origin = (process.env.APPROVAL_ORIGIN?.trim() || "https://approval.bnow.co.kr")
     .replace(/\/$/, "");
   return `${origin}/?focus=${encodeURIComponent(`${kind}:${requestId}`)}`;
@@ -77,7 +81,7 @@ export async function notifyAdminsAboutApprovalRequest(
     return;
   }
 
-    const kindLabel = notification.kind === "leave" ? "휴가" : "출장";
+    const kindLabel = notification.kind === "leave" ? "휴가" : notification.kind === "business-trip" ? "출장" : "출퇴근 사후 등록";
     const pageUrl = approvalPageUrl(notification.kind, notification.requestId);
 
     const results = await Promise.allSettled(
@@ -134,7 +138,7 @@ export async function notifyEmployeeAboutApprovalDecision(
     const recipientEmail = notification.employeeEmail?.trim();
     if (!webhook || !recipientEmail) return;
 
-    const kindLabel = notification.kind === "leave" ? "휴가" : "출장";
+    const kindLabel = notification.kind === "leave" ? "휴가" : notification.kind === "business-trip" ? "출장" : "출퇴근 사후 등록";
     const decisionLabel = notification.decision === "APPROVED" ? "승인" : "반려";
     const resultLabel = notification.decision === "APPROVED" ? "결재 완료" : "결재 반려";
     const note = notification.reviewerNote

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import LogoutButton from "./LogoutButton";
 import { isAdmin } from "@/lib/adminAuth";
+import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 import {
   currentLeavePeriod,
   minutesToDays,
@@ -220,6 +221,12 @@ export default async function AdminPage({
   }>;
 }) {
   if (!(await isAdmin())) redirect("/admin/login");
+  const adminEmployee = await getCurrentWorkboardEmployee("any");
+  const representativeEmail = process.env.APPROVAL_CEO_EMAIL?.trim().toLowerCase() || "elon.choo@bnow.co.kr";
+  const isRepresentative = adminEmployee?.email?.toLowerCase() === representativeEmail;
+  const pendingCorrectionCount = isRepresentative
+    ? await prisma.attendanceCorrectionRequest.count({ where: { status: "PENDING" } })
+    : 0;
 
   const {
     period: periodParam,
@@ -544,6 +551,7 @@ export default async function AdminPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
+          {isRepresentative && <Link href="/admin/attendance-corrections" className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 font-semibold text-blue-800 hover:bg-blue-100">출퇴근 사후 등록 {pendingCorrectionCount}건</Link>}
           <Link
             href="/admin/approvals"
             className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 font-semibold text-amber-800 hover:bg-amber-100"

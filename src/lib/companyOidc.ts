@@ -25,7 +25,7 @@ type Metadata = {
 };
 
 const ALLOWED_RETURN_PATHS = new Set([
-  "/attendance", "/check", "/records", "/leave", "/business-trips", "/profile", "/admin", "/admin/employees",
+  "/attendance", "/check", "/records", "/attendance-corrections", "/leave", "/business-trips", "/profile", "/admin", "/admin/employees", "/admin/attendance-corrections",
 ]);
 let metadataCache: { issuer: string; value: Metadata; expiresAt: number } | undefined;
 
