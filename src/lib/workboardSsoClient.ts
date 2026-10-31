@@ -4,6 +4,7 @@ const EMPLOYEE_PATHS = new Set([
   "/attendance",
   "/check",
   "/records",
+  "/attendance-corrections",
   "/leave",
   "/business-trips",
   "/profile",
