@@ -59,6 +59,14 @@ test("open IN and repeated IN are shown as missing OUT", () => {
   assert.deepEqual(rows[0].sessions, ["09:00–미등록", "13:00–17:00"]);
 });
 
+test("an open shift within 24 hours is working, not missing OUT", () => {
+  const rows = buildAttendanceDays([employee], [event("IN", "2026-11-02T00:00:00Z")], range, new Date("2026-11-02T01:00:00Z"));
+  assert.equal(rows[0].status, "근무 중");
+  assert.deepEqual(rows[0].sessions, ["09:00–진행 중"]);
+  const stale = buildAttendanceDays([employee], [event("IN", "2026-11-02T00:00:00Z")], range, new Date("2026-11-03T01:01:00Z"));
+  assert.equal(stale[0].status, "퇴근 미등록");
+});
+
 test("range validation rejects impossible dates and long periods", () => {
   assert.throws(() => parseAttendanceRange(new URLSearchParams("start=2026-02-30&end=2026-03-01")));
   assert.throws(() => parseAttendanceRange(new URLSearchParams("start=2026-01-01&end=2026-06-01")));

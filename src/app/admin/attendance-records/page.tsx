@@ -38,6 +38,7 @@ export default async function AdminAttendanceRecordsPage({
     if (employeeId) exportParams.set("employeeId", employeeId);
   }
   const completed = report?.rows.filter((row) => row.status === "완료").length ?? 0;
+  const working = report?.rows.filter((row) => row.status === "근무 중").length ?? 0;
   const exceptions = report?.rows.filter((row) => row.status === "퇴근 미등록" || row.status === "출근 누락").length ?? 0;
   const minutes = report?.rows.reduce((sum, row) => sum + row.minutes, 0) ?? 0;
 
@@ -88,11 +89,12 @@ export default async function AdminAttendanceRecordsPage({
       {error ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p> : null}
       {report ? <>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm text-slate-600">{report.range.startDay} ~ {report.range.endDay} · {report.rows.length}일 기록</div>
+          <div className="text-sm text-slate-600">{report.range.startDay} ~ {report.range.endDay} · {report.rows.length}개 직원·일</div>
           <a href={`/api/admin/attendance-records/export?${exportParams.toString()}`} className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">현재 조건 CSV</a>
         </div>
-        <section className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <section className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
           <Metric label="완료" value={`${completed}일`} />
+          <Metric label="근무 중" value={`${working}일`} />
           <Metric label="확인 필요" value={`${exceptions}일`} />
           <Metric label="기록 근무시간" value={formatWorkMinutes(minutes)} />
           <Metric label="취소 기록" value={`${report.rows.reduce((sum, row) => sum + row.cancelledCount, 0)}건`} />
@@ -108,7 +110,7 @@ export default async function AdminAttendanceRecordsPage({
               <td className="px-4 py-3">{row.firstIn ?? "—"}</td><td className="px-4 py-3">{row.lastOut ?? "—"}</td>
               <td className="px-4 py-3">{row.sessions.length ? row.sessions.join(" / ") : "—"}</td>
               <td className="whitespace-nowrap px-4 py-3">{row.minutes ? formatWorkMinutes(row.minutes) : "—"}</td>
-              <td className="whitespace-nowrap px-4 py-3"><span className={row.status === "완료" ? "text-emerald-700" : row.status === "퇴근 미등록" || row.status === "출근 누락" ? "font-semibold text-rose-700" : "text-slate-500"}>{row.status}</span></td>
+              <td className="whitespace-nowrap px-4 py-3"><span className={row.status === "완료" || row.status === "근무 중" ? "text-emerald-700" : row.status === "퇴근 미등록" || row.status === "출근 누락" ? "font-semibold text-rose-700" : "text-slate-500"}>{row.status}</span></td>
               <td className="px-4 py-3">{row.cancelledCount || "—"}</td>
             </tr>)}</tbody>
           </table>
