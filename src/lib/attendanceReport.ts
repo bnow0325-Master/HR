@@ -28,7 +28,7 @@ export type AttendanceDay = {
   lastOut: string | null;
   sessions: string[];
   minutes: number;
-  status: "완료" | "퇴근 미등록" | "출근 누락" | "미출근" | "기록 없음" | "예정";
+  status: "완료" | "근무 중" | "퇴근 미등록" | "출근 누락" | "미출근" | "기록 없음" | "예정";
   cancelledCount: number;
 };
 
@@ -185,9 +185,10 @@ export function buildAttendanceDays(
   for (const [employeeId, timestamp] of open) {
     const row = getRow(employeeId, kstDate(timestamp));
     if (row) {
+      const inProgress = now.getTime() >= timestamp.getTime() && now.getTime() - timestamp.getTime() <= DAY_MS;
       row.firstIn ??= kstTime(timestamp);
-      row.sessions.push(`${kstTime(timestamp)}–미등록`);
-      row.status = "퇴근 미등록";
+      row.sessions.push(`${kstTime(timestamp)}–${inProgress ? "진행 중" : "미등록"}`);
+      if (row.status !== "퇴근 미등록") row.status = inProgress ? "근무 중" : "퇴근 미등록";
     }
   }
 
