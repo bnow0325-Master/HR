@@ -16,6 +16,7 @@ export type ReportEmployee = {
   department: string | null;
   hireDate: Date | null;
   terminationDate: Date | null;
+  workMinutesPerDay?: number | null;
 };
 
 export type AttendanceDay = {
@@ -30,6 +31,37 @@ export type AttendanceDay = {
   minutes: number;
   status: "완료" | "근무 중" | "퇴근 미등록" | "출근 누락" | "미출근" | "기록 없음" | "예정";
   cancelledCount: number;
+};
+
+export type ImportedAttendanceDay = {
+  employeeId: string;
+  baseDate: Date;
+  checkInAt: Date | null;
+  checkOutAt: Date | null;
+  late: boolean;
+  earlyLeave: boolean;
+  workType: string | null;
+};
+
+export type ApprovedLeaveDay = {
+  employeeId: string;
+  leaveDate: Date;
+  leaveType: string;
+  unitsMinutes: number;
+};
+
+export type ApprovedTrip = {
+  employeeId: string;
+  startDate: Date;
+  endDate: Date;
+};
+
+export type ReportAttendanceDay = Omit<AttendanceDay, "status"> & {
+  status: AttendanceDay["status"] | "승인 휴가" | "승인 출장" | "이관 공백";
+  source: "HR" | "네이버웍스 이관" | "기록 없음";
+  notes: string[];
+  importedLate: boolean;
+  importedEarlyLeave: boolean;
 };
 
 export function kstDate(date: Date): string {
@@ -199,12 +231,92 @@ export function formatWorkMinutes(minutes: number) {
   return `${Math.floor(minutes / 60)}시간 ${String(minutes % 60).padStart(2, "0")}분`;
 }
 
-export function attendanceCsv(rows: AttendanceDay[]) {
+/** HR 원본을 우선하고, 없는 날짜에만 네이버웍스 이관 원장을 보조로 표시한다. */
+export function enrichAttendanceDays(
+  rows: AttendanceDay[],
+  employees: ReportEmployee[],
+  imported: ImportedAttendanceDay[],
+  leaves: ApprovedLeaveDay[],
+  trips: ApprovedTrip[],
+): ReportAttendanceDay[] {
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+  const importedByDay = new Map(imported.map((record) => [`${record.employeeId}:${kstDate(record.baseDate)}`, record]));
+  const leaveByDay = new Map<string, ApprovedLeaveDay[]>();
+  for (const leave of leaves) {
+    const key = `${leave.employeeId}:${kstDate(leave.leaveDate)}`;
+    leaveByDay.set(key, [...(leaveByDay.get(key) ?? []), leave]);
+  }
+  const tripDays = new Set<string>();
+  for (const trip of trips) {
+    const first = Date.parse(`${kstDate(trip.startDate)}T00:00:00Z`);
+    const last = Date.parse(`${kstDate(trip.endDate)}T00:00:00Z`);
+    for (let day = first; day <= last; day += DAY_MS) {
+      tripDays.add(`${trip.employeeId}:${new Date(day).toISOString().slice(0, 10)}`);
+    }
+  }
+
+  return rows.map((row) => {
+    const key = `${row.employeeId}:${row.date}`;
+    const result: ReportAttendanceDay = {
+      ...row,
+      source: row.sessions.length || row.cancelledCount ? "HR" : "기록 없음",
+      notes: [],
+      importedLate: false,
+      importedEarlyLeave: false,
+    };
+    const archive = importedByDay.get(key);
+    if (archive && !row.sessions.length) {
+      result.source = "네이버웍스 이관";
+      result.firstIn = archive.checkInAt ? kstTime(archive.checkInAt) : null;
+      result.lastOut = archive.checkOutAt ? kstTime(archive.checkOutAt) : null;
+      result.importedLate = archive.late;
+      result.importedEarlyLeave = archive.earlyLeave;
+      if (archive.workType) result.notes.push(`이관 근무유형: ${archive.workType}`);
+      if (archive.checkInAt && archive.checkOutAt) {
+        const duration = archive.checkOutAt.getTime() - archive.checkInAt.getTime();
+        result.sessions = [`${result.firstIn}–${result.lastOut}`];
+        if (duration >= 0 && duration <= DAY_MS) {
+          result.minutes = Math.round(duration / 60_000);
+          result.status = "완료";
+        } else {
+          result.status = "이관 공백";
+          result.notes.push("이관 시각 간격 확인 필요");
+        }
+      } else if (archive.checkInAt) {
+        result.sessions = [`${result.firstIn}–미등록`];
+        result.status = "퇴근 미등록";
+      } else if (archive.checkOutAt) {
+        result.sessions = [`출근 누락–${result.lastOut}`];
+        result.status = "출근 누락";
+      } else {
+        result.status = "이관 공백";
+      }
+    } else if (archive) {
+      result.notes.push("동일 날짜 이관 기록 있음 · HR 원장 우선");
+    }
+
+    const approvedLeaves = leaveByDay.get(key) ?? [];
+    if (approvedLeaves.length) {
+      const workMinutes = employeeById.get(row.employeeId)?.workMinutesPerDay;
+      const units = approvedLeaves.reduce((sum, leave) => sum + leave.unitsMinutes, 0);
+      const partial = workMinutes != null && units < workMinutes;
+      result.notes.push(`${partial ? "부분 " : ""}휴가 승인 · ${approvedLeaves.map((leave) => leave.leaveType).join(", ")} · ${units}분`);
+      if (!result.sessions.length) result.status = "승인 휴가";
+    }
+    if (tripDays.has(key)) {
+      result.notes.push("출장 승인");
+      if (!result.sessions.length) result.status = "승인 출장";
+    }
+    return result;
+  });
+}
+
+export function attendanceCsv(rows: ReportAttendanceDay[]) {
   const safe = (value: string | number) => {
     const text = String(value);
     const guarded = /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text;
     return `"${guarded.replaceAll('"', '""')}"`;
   };
-  const header = ["날짜", "사번", "직원", "부서", "첫 출근", "마지막 퇴근", "근무 세션", "근무시간(분)", "상태", "취소 기록 수"];
-  return `\uFEFF${[header, ...rows.map((row) => [row.date, row.code, row.name, row.department ?? "", row.firstIn ?? "", row.lastOut ?? "", row.sessions.join(" / "), row.minutes, row.status, row.cancelledCount])].map((line) => line.map(safe).join(",")).join("\r\n")}\r\n`;
+  const header = ["날짜", "사번", "직원", "부서", "첫 출근", "마지막 퇴근", "근무 세션", "출퇴근 시각 간격(분)", "상태", "원천", "확인 사항", "취소 기록 수"];
+  return `\uFEFF${[header, ...rows.map((row) => [row.date, row.code, row.name, row.department ?? "", row.firstIn ?? "", row.lastOut ?? "", row.sessions.join(" / "), row.minutes, row.status, row.source, [...row.notes, ...(row.importedLate ? ["이관 원장 지각"] : []), ...(row.importedEarlyLeave ? ["이관 원장 조퇴"] : [])].join(" / "), row.cancelledCount])].map((line) => line.map(safe).join(",")).join("\r\n")}\r\n`;
 }
