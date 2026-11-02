@@ -11,6 +11,7 @@ import {
 
 test("company OIDC return path is restricted to HR pages", () => {
   assert.equal(safeCompanyReturnTo("/leave"), "/leave");
+  assert.equal(safeCompanyReturnTo("/admin/attendance-records"), "/admin/attendance-records");
   assert.equal(safeCompanyReturnTo("//evil.example"), "/attendance");
   assert.equal(safeCompanyReturnTo("https://evil.example"), "/attendance");
 });

@@ -52,6 +52,7 @@ test("WorkBoard handoff return path cannot leave HR", () => {
   assert.equal(safeWorkboardReturnTo("//evil.example"), "/attendance");
   assert.equal(safeWorkboardReturnTo("https://evil.example"), "/attendance");
   assert.equal(safeWorkboardReturnTo("/admin/employees"), "/admin/employees");
+  assert.equal(safeWorkboardReturnTo("/admin/attendance-records"), "/admin/attendance-records");
 });
 
 test("WorkBoard handoff redirects through the public HR origin", () => {

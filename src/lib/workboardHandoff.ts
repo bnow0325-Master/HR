@@ -12,6 +12,7 @@ const ALLOWED_RETURN_PATHS = new Set([
   "/profile",
   "/admin",
   "/admin/employees",
+  "/admin/attendance-records",
 ]);
 
 export function safeWorkboardReturnTo(value: unknown) {
