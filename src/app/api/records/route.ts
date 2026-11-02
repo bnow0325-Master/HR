@@ -18,6 +18,7 @@ type EmployeeLite = {
 type RecordLite = {
   type: string;
   timestamp: Date;
+  method: string;
 };
 
 function parseMonth(month: string | undefined) {
@@ -96,6 +97,7 @@ function summarizeDay(records: RecordLite[]) {
     lastOut: lastRecord?.timestamp ?? null,
     totalMinutes,
     open: sorted.length === 1,
+    retroactive: sorted.some((record) => record.method === "CEO_APPROVED_RETROACTIVE"),
   };
 }
 
@@ -153,6 +155,7 @@ export async function POST(req: Request) {
       employeeId: true,
       type: true,
       timestamp: true,
+      method: true,
     },
     orderBy: [{ employeeId: "asc" }, { timestamp: "asc" }],
   });
@@ -186,6 +189,7 @@ export async function POST(req: Request) {
       workMinutes: summary.totalMinutes,
       workTime: summary.totalMinutes ? formatMinutes(summary.totalMinutes) : "-",
       open: summary.open,
+      retroactive: summary.retroactive,
     };
   });
 

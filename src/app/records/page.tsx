@@ -22,6 +22,7 @@ type RecordRow = {
   checkOut: string | null;
   workTime: string;
   open: boolean;
+  retroactive?: boolean;
 };
 
 type RecordGroup = {
@@ -305,9 +306,7 @@ function RecordsPageContent() {
             로그인한 사용자의 월간 출퇴근 시간과 근무시간을 확인합니다.
           </p>
         </div>
-        <Link href="/" className="text-sm text-slate-400 hover:text-slate-600">
-          홈
-        </Link>
+        <div className="flex gap-4"><Link href="/attendance-corrections" className="text-sm font-semibold text-blue-700">출퇴근 누락 사후 등록 요청</Link><Link href="/" className="text-sm text-slate-400 hover:text-slate-600">홈</Link></div>
       </div>
 
       <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4">
@@ -424,6 +423,7 @@ function RecordsPageContent() {
                             ) : (
                               <span className="text-slate-400">완료</span>
                             )}
+                            {row.retroactive && <span className="ml-2 text-xs text-blue-700">대표 승인 사후등록</span>}
                           </td>
                         </tr>
                       ))}
