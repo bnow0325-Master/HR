@@ -19,7 +19,7 @@ function companyLoginUrl(returnTo: string) {
 
 function requiredCapability(returnTo: string) {
   const path = returnTo.split("?", 1)[0];
-  if (path === "/check" || path === "/records") return "attendance";
+  if (path === "/check") return "attendance";
   if (path === "/leave" || path === "/business-trips") return "leave";
   return "any";
 }

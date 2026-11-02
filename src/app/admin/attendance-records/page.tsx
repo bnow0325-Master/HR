@@ -45,7 +45,7 @@ export default async function AdminAttendanceRecordsPage({
   }
   const completed = report?.rows.filter((row) => row.status === "완료").length ?? 0;
   const working = report?.rows.filter((row) => row.status === "근무 중").length ?? 0;
-  const exceptions = report?.rows.filter((row) => ["퇴근 미등록", "출근 누락", "이관 공백"].includes(row.status)).length ?? 0;
+  const exceptions = report?.rows.filter((row) => ["퇴근 미등록", "출근 누락", "이관 공백", "미출근"].includes(row.status)).length ?? 0;
   const minutes = report?.rows.reduce((sum, row) => sum + row.minutes, 0) ?? 0;
 
   return (
@@ -121,7 +121,7 @@ export default async function AdminAttendanceRecordsPage({
               <td className="px-4 py-3">{row.firstIn ?? "—"}</td><td className="px-4 py-3">{row.lastOut ?? "—"}</td>
               <td className="px-4 py-3">{row.sessions.length ? row.sessions.join(" / ") : "—"}</td>
               <td className="whitespace-nowrap px-4 py-3">{row.minutes ? formatWorkMinutes(row.minutes) : "—"}</td>
-              <td className="whitespace-nowrap px-4 py-3"><span className={row.status === "완료" || row.status === "근무 중" ? "text-emerald-700" : row.status === "퇴근 미등록" || row.status === "출근 누락" ? "font-semibold text-rose-700" : "text-slate-500"}>{row.status}</span></td>
+              <td className="whitespace-nowrap px-4 py-3"><span className={row.status === "완료" || row.status === "근무 중" ? "text-emerald-700" : row.status === "퇴근 미등록" || row.status === "출근 누락" ? "font-semibold text-rose-700" : "text-slate-500"}>{statusLabel(row)}</span></td>
               <td className="px-4 py-3"><strong>{row.source}</strong>{recordNotes(row) ? <div className="mt-1 text-xs text-slate-600">{recordNotes(row)}</div> : null}</td>
               <td className="px-4 py-3">{row.cancelledCount || "—"}</td>
             </tr>)}</tbody>
@@ -132,7 +132,7 @@ export default async function AdminAttendanceRecordsPage({
           {report.rows.map((row) => <article key={`${row.employeeId}:${row.date}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div><p className="text-sm font-bold text-slate-950">{row.name} <span className="font-normal text-slate-500">({row.code})</span></p><p className="mt-1 text-xs text-slate-500">{row.date} · {row.department ?? "부서 미지정"}</p></div>
-              <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">{row.status}</span>
+              <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">{statusLabel(row)}</span>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
               <div className="rounded-xl bg-blue-50 p-2.5"><dt className="text-xs text-blue-700">출근</dt><dd className="mt-1 font-bold text-slate-900">{row.firstIn ?? "미등록"}</dd></div>
@@ -152,6 +152,12 @@ export default async function AdminAttendanceRecordsPage({
 
 function recordNotes(row: ReportAttendanceDay) {
   return [...row.notes, ...(row.importedLate ? ["이관 원장 지각"] : []), ...(row.importedEarlyLeave ? ["이관 원장 조퇴"] : [])].join(" · ");
+}
+
+function statusLabel(row: ReportAttendanceDay) {
+  if (row.status === "미출근") return "기록 없음 · 확인 필요";
+  if (row.status === "이관 공백") return "이관 기록 공백";
+  return row.status;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

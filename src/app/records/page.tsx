@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { loadAdminAttendanceReport } from "@/lib/adminAttendanceReport";
 import { formatWorkMinutes, kstDate, type ReportAttendanceDay } from "@/lib/attendanceReport";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
@@ -23,8 +22,8 @@ function note(row: ReportAttendanceDay) {
 }
 
 export default async function RecordsPage({ searchParams }: { searchParams: Promise<{ month?: string | string[] }> }) {
-  const employee = await getCurrentWorkboardEmployee("attendance");
-  if (!employee) redirect("/api/auth/company/login?returnTo=%2Frecords");
+  const employee = await getCurrentWorkboardEmployee("any");
+  if (!employee) return <main className="mx-auto max-w-lg px-4 py-12"><h1 className="text-2xl font-bold">내 출퇴근 기록</h1><p className="mt-3 text-sm text-slate-600">회사 계정으로 로그인하면 본인의 기록을 볼 수 있습니다.</p><Link href="/api/auth/company/login?returnTo=%2Frecords" className="mt-5 inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">회사 계정으로 로그인</Link></main>;
 
   const requested = (await searchParams).month;
   const month = typeof requested === "string" ? requested : kstDate(new Date()).slice(0, 7);
