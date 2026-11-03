@@ -15,6 +15,21 @@ function anniversary(hireDate: Date, year: number) {
   return new Date(Date.UTC(year, hire.month, day));
 }
 
+// BNOW welfare policy allows advance annual-leave requests; settlement occurs at departure.
+export const MAX_NEGATIVE_LEAVE_DAYS = 12;
+
+export function canRequestAnnualLeave(
+  remainingMinutes: number,
+  requestedMinutes: number,
+  workMinutesPerDay: number,
+) {
+  if (workMinutesPerDay <= 0) return false;
+  return (
+    remainingMinutes - requestedMinutes >=
+    -MAX_NEGATIVE_LEAVE_DAYS * workMinutesPerDay
+  );
+}
+
 export function completedMonths(hireDate: Date, asOf: Date) {
   const hire = dateParts(hireDate);
   const current = dateParts(asOf);
