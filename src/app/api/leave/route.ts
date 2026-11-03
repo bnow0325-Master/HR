@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
+  canRequestAnnualLeave,
   currentLeavePeriod,
   minutesToDays,
   startOfKstDate,
@@ -284,9 +285,13 @@ export async function POST(req: Request) {
     Math.round(
       current.summary.remainingDays * current.employee.workMinutesPerDay,
     );
-  if (unitsMinutes > remainingMinutes) {
+  if (!canRequestAnnualLeave(
+    remainingMinutes,
+    unitsMinutes,
+    current.employee.workMinutesPerDay,
+  )) {
     return NextResponse.json(
-      { error: "사용 가능한 연차가 부족합니다." },
+      { error: "휴가 신청은 잔여 연차 -12일까지 가능합니다." },
       { status: 409 },
     );
   }

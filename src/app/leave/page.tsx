@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
+  canRequestAnnualLeave,
   currentLeavePeriod,
   minutesToDays,
   statutoryAnnualLeaveDays,
@@ -273,11 +274,18 @@ export default function LeavePage() {
         });
         return;
       }
-      if (
-        minutesToDays(unitsMinutes, employee.workMinutesPerDay) >
-        summary.remainingDays
-      ) {
-        setMessage({ ok: false, text: "사용 가능한 연차가 부족합니다." });
+      const remainingMinutes = Math.round(
+        summary.remainingDays * employee.workMinutesPerDay,
+      );
+      if (!canRequestAnnualLeave(
+        remainingMinutes,
+        unitsMinutes,
+        employee.workMinutesPerDay,
+      )) {
+        setMessage({
+          ok: false,
+          text: "휴가 신청은 잔여 연차 -12일까지 가능합니다.",
+        });
         return;
       }
       if (
@@ -471,7 +479,8 @@ export default function LeavePage() {
             >
               <h2 className="text-xl font-bold text-slate-900">휴가 신청</h2>
               <p className="mt-1 text-sm text-slate-500">
-                휴가 종류와 날짜를 선택해 신청하세요.
+                휴가 종류와 날짜를 선택해 신청하세요. 잔여 연차가 -12일이 될
+                때까지 신청할 수 있습니다.
               </p>
               <div className="mt-4 flex flex-col gap-3">
                 <label className="text-sm font-medium text-slate-600">
