@@ -155,17 +155,10 @@ export async function POST(req: Request) {
     // Serialize this employee's check-in/check-out requests across server replicas.
     await tx.$queryRaw`SELECT id FROM Employee WHERE id = ${employeeId} FOR UPDATE`;
     const existing = await tx.attendanceRecord.findFirst({
-      where: { employeeId, type, cancelledAt: null, timestamp: { gte: todayRange.start, lt: todayRange.end } },
+      where: { employeeId, type, cancelledAt: null, timestamp: { gte: new Date(Date.now() - 60_000) } },
       select: { id: true },
     });
     if (existing) return null;
-    if (type === "OUT") {
-      const checkIn = await tx.attendanceRecord.findFirst({
-        where: { employeeId, type: "IN", cancelledAt: null, timestamp: { gte: todayRange.start, lt: todayRange.end } },
-        select: { id: true },
-      });
-      if (!checkIn) return null;
-    }
     const saved = await tx.attendanceRecord.create({
       data: {
         employeeId, type, method: hasLocation ? "PC_LOCATION" : "MANUAL",
@@ -180,7 +173,7 @@ export async function POST(req: Request) {
     return saved;
   });
   if (!record) {
-    return NextResponse.json({ error: "이미 등록되었거나 출근 기록이 없습니다." }, { status: 409 });
+    return NextResponse.json({ error: "이미 등록된 출퇴근 기록입니다." }, { status: 409 });
   }
   after(() => dispatchPendingHrNotifications(1).then(() => undefined).catch(() => undefined));
 
