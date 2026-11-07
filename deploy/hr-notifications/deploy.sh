@@ -4,6 +4,8 @@
 set -Eeuo pipefail
 umask 077
 test "$(id -u)" = 0 || { echo 'An approved operator must run this file as root.' >&2; exit 77; }
+exec 9>/run/lock/bnow-hr-notifications-deploy.lock
+flock --nonblock 9 || { echo 'Another HR notification deployment is active.' >&2; exit 75; }
 test "$#" = 6 || { echo 'Expected six reviewed deployment arguments.' >&2; exit 64; }
 archive=$1; digest=$2; commit=$3; expected_image=$4; old_dir=$5; release_id=$6
 [[ "$archive" =~ ^/home/elonchoo/[A-Za-z0-9._-]+\.tar\.gz$ ]]
@@ -59,6 +61,7 @@ cat > "$backup/rollback.sh" <<ROLLBACK
 #!/usr/bin/env bash
 set -Eeuo pipefail
 test "\$(id -u)" = 0
+test "\$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' bnow-checkinout-app-1)" = '$new_dir' || { echo 'A different HR release is running; rollback refused.' >&2; exit 75; }
 systemctl disable --now bnow-hr-notifications.timer || true
 systemctl stop bnow-hr-notifications.service || true
 docker image tag '$expected_image' bnow-checkinout-app:latest
@@ -69,14 +72,16 @@ chmod 0700 "$backup/rollback.sh"
 bash -n "$backup/rollback.sh"
 (cd "$backup" && sha256sum previous-release.tar.gz hr-database.sql.gz previous-release.txt previous-image.txt rollback.sh > backup.sha256 && sha256sum --check backup.sha256)
 # Validate this new schema against a fresh, isolated restore before touching production schema.
-restore_db="bnow_hr_notify_verify_$(date -u +%Y%m%d%H%M%S)"
-[[ "$restore_db" =~ ^bnow_hr_notify_verify_[0-9]{14}$ ]]
+restore_db="bnow_hr_notify_verify_$(date -u +%Y%m%d%H%M%S)_${RANDOM}"
+[[ "$restore_db" =~ ^bnow_hr_notify_verify_[0-9]{14}_[0-9]{1,5}$ ]]
 db_sql() {
   docker exec -i bnow-hr-mariadb sh -ec 'export MYSQL_PWD="$(cat /run/secrets/mariadb_root_password)"; exec mariadb -uroot --batch --skip-column-names "$@"' sh "$@"
 }
-cleanup_restore() { db_sql --execute "DROP DATABASE IF EXISTS \`$restore_db\`;" >/dev/null; }
+restore_created=false
+cleanup_restore() { if $restore_created; then db_sql --execute "DROP DATABASE IF EXISTS \`$restore_db\`;" >/dev/null; restore_created=false; fi; }
 trap cleanup_restore EXIT
 db_sql --execute "CREATE DATABASE \`$restore_db\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+restore_created=true
 gzip -dc "$backup/hr-database.sql.gz" | db_sql "$restore_db"
 db_sql "$restore_db" < "$new_dir/prisma/migrations-mariadb/20261107130000_hr_notification_outbox/migration.sql"
 test "$(db_sql --execute "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$restore_db' AND table_name IN ('Employee','AttendanceRecord','LeaveRequest','BusinessTrip','HrNotificationOutbox');")" = 5
@@ -87,8 +92,14 @@ compose=(docker compose --project-name bnow-checkinout --project-directory "$new
 switched=false
 on_failure() {
   rc=$?
-  docker image tag "$expected_image" bnow-checkinout-app:latest || true
-  if $switched; then bash "$backup/rollback.sh"; fi
+  current_dir=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' bnow-checkinout-app-1 2>/dev/null || true)
+  if $switched && test "$current_dir" = "$new_dir"; then
+    bash "$backup/rollback.sh"
+  elif ! $switched && test "$current_dir" = "$old_dir"; then
+    docker image tag "$expected_image" bnow-checkinout-app:latest || true
+  else
+    echo 'Another release changed the running app; automatic rollback was refused.' >&2
+  fi
   echo 'Deployment stopped; inspect the reviewed deployment record. No production database restore was performed.' >&2
   exit "$rc"
 }
@@ -96,6 +107,8 @@ trap on_failure ERR
 "${compose[@]}" build app migrate
 # Build failure never replaces the running app. Migration adds the outbox table only.
 "${compose[@]}" run --rm migrate
+test "$(docker inspect --format '{{.Image}}' bnow-checkinout-app-1)" = "$expected_image"
+test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' bnow-checkinout-app-1)" = "$old_dir"
 switched=true
 "${compose[@]}" up -d --no-build --no-deps app
 healthy=false
