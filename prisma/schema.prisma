@@ -147,6 +147,26 @@ model AttendanceRecord {
   @@index([employeeId, cancelledAt, timestamp])
 }
 
+model HrNotificationOutbox {
+  id             String    @id @default(cuid())
+  idempotencyKey String    @unique @db.VarChar(190)
+  recipientEmail String    @db.VarChar(320)
+  audience       String    @db.VarChar(20)
+  senderName     String    @db.VarChar(80)
+  title          String    @db.VarChar(200)
+  message        String    @db.Text
+  status         String    @default("PENDING") @db.VarChar(20)
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now())
+  sentAt         DateTime?
+  remoteRoomId   String?   @db.VarChar(36)
+  remoteMessageSeq Int?
+  lastError      String?   @db.VarChar(200)
+  createdAt      DateTime  @default(now())
+
+  @@index([status, nextAttemptAt])
+}
+
 model LeaveRequest {
   id              String    @id @default(cuid())
   employee        Employee  @relation(fields: [employeeId], references: [id])

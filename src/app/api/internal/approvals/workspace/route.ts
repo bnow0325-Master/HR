@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import {
   employeeDirectoryApiConfigured,
   isEmployeeDirectoryRequestAuthorized,
 } from "@/lib/internalApiAuth";
 import { prisma } from "@/lib/prisma";
+import { dispatchPendingHrNotifications, enqueueApprovedAbsenceNotification } from "@/lib/hrNotifications";
 import {
   notifyCeoAboutApprovalDocument,
   notifyEmployeeAboutApprovalDecision,
@@ -535,6 +536,10 @@ export async function POST(request: Request) {
             note: parsed.note,
           },
         });
+        if (decision === "APPROVED") await enqueueApprovedAbsenceNotification(tx, {
+          kind: "leave", requestId: leave.id, employeeName: leave.employee.name,
+          description: `${dateValue(leave.leaveDate)} ${leaveTypeLabel(leave.leaveType)}`,
+        });
         return {
           kind: "leave" as const,
           requestId: leave.id,
@@ -581,6 +586,10 @@ export async function POST(request: Request) {
           note: parsed.note,
         },
       });
+      if (decision === "APPROVED") await enqueueApprovedAbsenceNotification(tx, {
+        kind: "business-trip", requestId: trip.id, employeeName: trip.employee.name,
+        description: `${dateValue(trip.startDate)} ~ ${dateValue(trip.endDate)}`,
+      });
       return {
         kind: "business-trip" as const,
         requestId: trip.id,
@@ -600,6 +609,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "이미 처리되었거나 최신 상태가 아닌 신청입니다." }, { status: 409, headers: noStoreHeaders });
     }
     await notifyEmployeeAboutApprovalDecision({ ...notification, decision, reviewerNote: parsed.note });
+    after(() => dispatchPendingHrNotifications(1).then(() => undefined).catch(() => undefined));
     return NextResponse.json({ ok: true }, { headers: noStoreHeaders });
   }
   if (parsed.decision === "REJECTED" && !parsed.note) {

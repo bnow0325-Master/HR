@@ -65,6 +65,9 @@ jobs:
       - name: Test profile photo validation
         run: npm run test:profile-photo
 
+      - name: Test private HR notifications against isolated MariaDB
+        run: npm run test:notifications
+
       - name: Type-check
         run: npm run typecheck
 

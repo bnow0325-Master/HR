@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/adminAuth";
 import { hasCurrentLocationConsent } from "@/lib/locationConsent";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
+import { dispatchPendingHrNotifications, enqueueAttendanceNotifications } from "@/lib/hrNotifications";
 
 type CheckBody = {
   action?: "CANCEL_OUT";
@@ -94,12 +95,20 @@ export async function POST(req: Request) {
       );
     }
 
-    const update = await prisma.attendanceRecord.updateMany({
-      where: { id: checkoutRecord.id, cancelledAt: null },
-      data: {
-        cancelledAt: now,
-        cancelNote: "EMPLOYEE_UNDO_WITHIN_30_MINUTES",
-      },
+    const update = await prisma.$transaction(async (tx) => {
+      const result = await tx.attendanceRecord.updateMany({
+        where: { id: checkoutRecord.id, cancelledAt: null },
+        data: { cancelledAt: now, cancelNote: "EMPLOYEE_UNDO_WITHIN_30_MINUTES" },
+      });
+      if (result.count === 1) {
+        await enqueueAttendanceNotifications(tx, {
+          recordId: checkoutRecord.id, type: "CANCEL_OUT",
+          employeeName: authenticatedEmployee.name,
+          employeeEmail: authenticatedEmployee.email,
+          timestamp: checkoutRecord.timestamp,
+        });
+      }
+      return result;
     });
 
     if (update.count !== 1) {
@@ -108,6 +117,8 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
+
+    after(() => dispatchPendingHrNotifications(1).then(() => undefined).catch(() => undefined));
 
     return NextResponse.json({
       ok: true,
@@ -140,16 +151,31 @@ export async function POST(req: Request) {
     employee !== null &&
     hasCurrentLocationConsent(employee);
 
-  const record = await prisma.attendanceRecord.create({
-    data: {
-      employeeId,
-      type,
-      method: hasLocation ? "PC_LOCATION" : "MANUAL",
-      verified: hasLocation,
-      latitude: hasLocation ? latitude : null,
-      longitude: hasLocation ? longitude : null,
-    },
+  const record = await prisma.$transaction(async (tx) => {
+    // Serialize this employee's check-in/check-out requests across server replicas.
+    await tx.$queryRaw`SELECT id FROM Employee WHERE id = ${employeeId} FOR UPDATE`;
+    const existing = await tx.attendanceRecord.findFirst({
+      where: { employeeId, type, cancelledAt: null, timestamp: { gte: new Date(Date.now() - 60_000) } },
+      select: { id: true },
+    });
+    if (existing) return null;
+    const saved = await tx.attendanceRecord.create({
+      data: {
+        employeeId, type, method: hasLocation ? "PC_LOCATION" : "MANUAL",
+        verified: hasLocation, latitude: hasLocation ? latitude : null,
+        longitude: hasLocation ? longitude : null,
+      },
+    });
+    await enqueueAttendanceNotifications(tx, {
+      recordId: saved.id, type, employeeName: authenticatedEmployee.name,
+      employeeEmail: authenticatedEmployee.email, timestamp: saved.timestamp,
+    });
+    return saved;
   });
+  if (!record) {
+    return NextResponse.json({ error: "이미 등록된 출퇴근 기록입니다." }, { status: 409 });
+  }
+  after(() => dispatchPendingHrNotifications(1).then(() => undefined).catch(() => undefined));
 
   return NextResponse.json({
     ok: true,

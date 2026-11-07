@@ -1,0 +1,11 @@
+[Unit]
+Description=Retry HR private notifications every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+AccuracySec=5s
+Unit=bnow-hr-notifications.service
+
+[Install]
+WantedBy=timers.target

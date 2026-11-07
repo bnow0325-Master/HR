@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 import { notifyEmployeeAboutApprovalDecision } from "@/lib/workboardApprovalNotifications";
+import { dispatchPendingHrNotifications, enqueueApprovedAbsenceNotification } from "@/lib/hrNotifications";
 
 type ApprovalKind = "leave" | "business-trip";
 type ApprovalBody = {
@@ -114,13 +115,17 @@ export async function PATCH(request: Request) {
         },
       });
       const leaveLabel = leave.leaveType === "ANNUAL" ? "연차" : leave.leaveType === "AM_HALF" ? "오전 반차" : "오후 반차";
+      const description = `${leave.leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveLabel}`;
+      if (decision === "APPROVED") await enqueueApprovedAbsenceNotification(tx, {
+        kind: "leave", requestId: leave.id, employeeName: leave.employee.name, description,
+      });
       return {
         kind: "leave" as const,
         requestId: leave.id,
         employeeName: leave.employee.name,
         employeeCode: leave.employee.code,
         employeeEmail: leave.employee.email,
-        description: `${leave.leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveLabel}`,
+        description,
       };
     }
 
@@ -160,13 +165,17 @@ export async function PATCH(request: Request) {
         note: reviewerNote,
       },
     });
+    const description = `${trip.startDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ~ ${trip.endDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })}`;
+    if (decision === "APPROVED") await enqueueApprovedAbsenceNotification(tx, {
+      kind: "business-trip", requestId: trip.id, employeeName: trip.employee.name, description,
+    });
     return {
       kind: "business-trip" as const,
       requestId: trip.id,
       employeeName: trip.employee.name,
       employeeCode: trip.employee.code,
       employeeEmail: trip.employee.email,
-      description: `${trip.startDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ~ ${trip.endDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })}`,
+      description,
     };
   }).catch((error: unknown) => {
     if (error instanceof Error && error.message === "APPROVED_TRIP_OVERLAP") return "overlap" as const;
@@ -181,5 +190,6 @@ export async function PATCH(request: Request) {
   }
 
   await notifyEmployeeAboutApprovalDecision({ ...notification, decision, reviewerNote });
+  after(() => dispatchPendingHrNotifications(1).then(() => undefined).catch(() => undefined));
   return NextResponse.json({ ok: true });
 }

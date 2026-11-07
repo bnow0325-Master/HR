@@ -580,6 +580,12 @@ export default async function AdminPage({
           >
             네이버웍스 원장
           </Link>
+          <Link
+            href="/admin/notifications"
+            className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 font-semibold text-sky-800 hover:bg-sky-100"
+          >
+            인사 알림 상태
+          </Link>
           <LogoutButton />
         </div>
       </header>
