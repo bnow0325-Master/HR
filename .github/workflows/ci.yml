@@ -68,6 +68,9 @@ jobs:
       - name: Test private HR notifications against isolated MariaDB
         run: npm run test:notifications
 
+      - name: Test new-release HR notification configuration preparation
+        run: python3 -m unittest discover -s deploy/hr-notifications -p 'test_prepare_env.py'
+
       - name: Type-check
         run: npm run typecheck
 

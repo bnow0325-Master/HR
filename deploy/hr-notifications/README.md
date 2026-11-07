@@ -17,7 +17,7 @@ HR의 확정 출퇴근/퇴근 취소, 승인된 휴가·출장을 내구성 outb
 1. 최신 공식 `origin/main`과 기능 PR의 CI를 확인한다. 로컬 미커밋 변경을 보존한다.
 2. 운영자가 정확한 파일 SHA-256을 확인한 `preflight.sh`를 실행한다. 출력의 실제 앱 이미지, Compose working_dir/project, HR DB health, HR webhook origin/path와 구성 여부를 기록한다. 출력에 암호·토큰·전체 환경파일은 포함하지 않는다.
 3. 링크나 이전 문서만으로 운영 릴리스를 확정하지 않는다. 실제 컨테이너 작업 디렉터리와 이미지가 배포 인자와 일치해야 한다.
-4. 기존 webhook이 `main.bnow.co.kr` 등 다른 곳이면 해당 경로의 실제 API/인증 계약을 운영자가 먼저 확인한다. 미확인 호스트를 임의로 허용하거나 토큰을 다른 곳으로 보내지 않는다. 현재 배포 스크립트는 공식 `chat.bnow.co.kr/api/staff-chat/webhooks/incoming`만 허용해 불일치 시 전환 전에 중단한다.
+4. 현재 실행 중인 09a032d HR 앱에는 webhook URL이 미구성임을 확인했다. 별도 준비된 HR 릴리스 `66869b0-approval-notifications`의 HR 환경에는 기존 연동 설정이 있으며 목적지 host/path만 확인했다. `prepare-env.py`는 이 정확한 HR 준비 경로 또는 현재 HR의 기존 설정만 사용한다. `main.bnow.co.kr`과 `chat.bnow.co.kr`의 정확한 inbound 경로만 출처로 허용하고, 새 릴리스의 발송 목적지는 공식 `chat.bnow.co.kr`로 정한다. 임의 외부 URL·placeholder·비정상 자격정보는 전환 전에 거절한다. 거부된 비노우톡 환경파일은 읽지 않는다. 키 호환성과 실제 수신은 배포 후 대표 전용 연결 확인에서 별도로 검증한다.
 5. `git archive`로 최신 main 전체를 묶고 로컬·서버 SHA-256을 비교한다. 배포 전 태그를 공식 원격에 보존한다.
 
 ## 배포 파일 인자
