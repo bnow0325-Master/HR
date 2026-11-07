@@ -51,6 +51,11 @@ class PrepareEnvironment(unittest.TestCase):
         self.assertFalse(module.allowed_destination(module.CANONICAL + "?key=test-only"))
         self.assertFalse(module.allowed_destination("https://test-only@chat.bnow.co.kr/api/staff-chat/webhooks/incoming"))
 
+    def test_cli_target_is_only_a_named_new_notification_release(self):
+        self.assertTrue(module.target_eligible(Path("/opt/bnow/hr-releases/123abcd-20261107-1310-hr-notifications/.env.production.local")))
+        self.assertFalse(module.target_eligible(Path("/opt/bnow/hr-releases/09a032d-20261103-trial-access/.env.production.local")))
+        self.assertFalse(module.target_eligible(Path("/opt/bnow/hr-releases/another/path/123abcd-20261107-1310-hr-notifications/.env.production.local")))
+
 
 if __name__ == "__main__":
     unittest.main()

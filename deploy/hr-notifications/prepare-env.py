@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import secrets
 from urllib.parse import urlsplit
 
@@ -35,6 +36,12 @@ def allowed_destination(value):
         return False
 
 
+def target_eligible(target):
+    return (target.parent.parent == Path("/opt/bnow/hr-releases")
+            and target.name == ".env.production.local"
+            and re.fullmatch(r"[a-f0-9]{7}-[0-9]{8}-[0-9]{4}-hr-notifications", target.parent.name) is not None)
+
+
 def prepare(target, prepared):
     text = target.read_text(encoding="utf-8")
     existing = values(text)
@@ -61,7 +68,7 @@ if __name__ == "__main__":
     parser.add_argument("target")
     args = parser.parse_args()
     target = Path(args.target).resolve()
-    if not str(target).startswith("/opt/bnow/hr-releases/") or target.name != ".env.production.local":
+    if not target_eligible(target):
         raise SystemExit("Only a new HR release environment is eligible")
     if PREPARED.resolve() != PREPARED:
         raise SystemExit("Prepared HR environment path changed; operator verification required")
