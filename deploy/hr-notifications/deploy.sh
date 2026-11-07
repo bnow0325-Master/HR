@@ -31,21 +31,8 @@ tar -xzf "$archive" -C "$new_dir" --no-same-owner
 test -f "$new_dir/deploy/hr-notifications/dispatch-tick.mjs"
 test -f "$new_dir/prisma/migrations-mariadb/20261107130000_hr_notification_outbox/migration.sql"
 install -m 0600 "$old_dir/.env.production.local" "$new_dir/.env.production.local"
-# Keep existing credentials private; generate only the new scheduler token.
-python3 - "$new_dir/.env.production.local" <<'PY'
-import pathlib,secrets,sys,urllib.parse
-p=pathlib.Path(sys.argv[1]); text=p.read_text(); values={}
-for line in text.splitlines():
-    if '=' in line and not line.lstrip().startswith('#'):
-        k,v=line.split('=',1); values[k.strip()]=v.strip().strip('"\'')
-target=urllib.parse.urlsplit(values.get('WORKBOARD_STAFF_CHAT_WEBHOOK_URL',''))
-if target.scheme!='https' or target.netloc!='chat.bnow.co.kr' or target.path!='/api/staff-chat/webhooks/incoming':
-    raise SystemExit('Existing HR notification destination must be verified before deployment')
-if not values.get('WORKBOARD_STAFF_CHAT_WEBHOOK_TOKEN'):
-    raise SystemExit('Existing HR inbound credential is not configured')
-if not values.get('HR_NOTIFICATION_CRON_TOKEN'):
-    p.write_text(text.rstrip()+'\nHR_NOTIFICATION_CRON_TOKEN='+secrets.token_hex(32)+'\n')
-PY
+# Reuse only the existing, named HR integration configuration; do not read chat secrets.
+python3 "$new_dir/deploy/hr-notifications/prepare-env.py" "$new_dir/.env.production.local"
 printf '%s\n' "$commit" > "$new_dir/.deployment-commit"
 printf '%s\n' "$old_dir" > "$backup/previous-release.txt"
 printf '%s\n' "$expected_image" > "$backup/previous-image.txt"
