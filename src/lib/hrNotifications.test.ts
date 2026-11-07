@@ -3,6 +3,7 @@ import test from "node:test";
 import type { Prisma } from "@prisma/client";
 
 process.env.DATABASE_URL ||= "mysql://test:test@127.0.0.1:3306/test";
+process.env.APPROVAL_CEO_EMAIL = "executive@example.test";
 
 test("one attendance save queues CEO and only the allowed employee", async () => {
   const { enqueueAttendanceNotifications } = await import("./hrNotifications");

@@ -1,0 +1,11 @@
+[Unit]
+Description=BNOW HR notification outbox and KST absence summary
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker exec bnow-checkinout-app-1 node /app/hr-notification-tick.mjs
+TimeoutStartSec=115
+StandardOutput=journal
+StandardError=journal
