@@ -21,4 +21,3 @@ test("HTTP 202 is not delivery unless chat saved a message", () => {
   assert.equal(chatSaved({ chatOk: true, messageSeq: 0 }), false);
   assert.equal(chatSaved({ chatOk: true, messageSeq: 42, roomId: "direct" }), true);
 });
-
