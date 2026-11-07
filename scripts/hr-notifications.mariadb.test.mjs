@@ -46,7 +46,8 @@ test('actual MariaDB row locks serialize concurrent attendance requests and pers
 test('actual MariaDB outbox insertion failure rolls back attendance instead of creating an unnotified committed record',
   {skip:eligible?false:'requires the disposable CI hr_ci@localhost/bnow_hr service'},async()=>fixture(async(db,id)=>{
     const h=await harness({now:Date.now(),database:db,employee:{id,email:`${'x'.repeat(321)}@example.test`}});
-    await assert.rejects(h.post({type:'IN'}));
+    await db.hrNotificationOutbox.count(); // Do not mistake missing schema for the expected failure.
+    await assert.rejects(h.post({type:'IN'}), error=>error.code==='P2000');
     assert.equal(await db.attendanceRecord.count({where:{employeeId:id}}),0);
     assert.equal(h.state.after.length,0);
     assert.equal(h.state.fetches.length,0);

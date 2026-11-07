@@ -30,6 +30,7 @@
 - `preflight.sh`, `deploy.sh`의 bash 구문, `git diff --check` 통과.
 - 주간 경계 테스트에서 처음 기대했던 KST timestamp를 기존 달력 날짜의 UTC 자정 저장 규약에 맞게 수정했다. 운영 시간대 장애로 분류하지 않는다.
 - `SKIPPED`가 대기 건수에 포함되던 문제, 대표 ADMIN 검증, 응답 전 발송 지연을 리뷰에서 보완했다.
+- 첫 CI 실제 DB 시험에서 outbox 테이블 누락을 발견했다. 새 SQL이 레거시 PostgreSQL 디렉터리에 있었으나 `prisma.config.ts`는 `prisma/migrations-mariadb`를 사용했다. 활성 MariaDB 경로로 옮기고 배포의 격리 SQL 경로도 수정했다. 실패 원자성 시험은 테이블 존재와 길이 초과 오류 `P2000`까지 확인하여 다른 실패를 성공으로 오인하지 않게 보완했다. 수정 후 CI를 다시 확인한다.
 
 ## 미완료와 운영 게이트
 

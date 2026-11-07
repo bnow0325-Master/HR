@@ -1,3 +1,4 @@
+-- Active MariaDB migration directory is configured in prisma.config.ts.
 CREATE TABLE `HrNotificationOutbox` (
   `id` VARCHAR(191) NOT NULL,
   `idempotencyKey` VARCHAR(190) NOT NULL,

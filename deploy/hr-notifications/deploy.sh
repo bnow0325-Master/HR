@@ -27,7 +27,7 @@ install -d -m 0700 "$backup"
 install -d -m 0755 "$new_dir"
 tar -xzf "$archive" -C "$new_dir" --no-same-owner
 test -f "$new_dir/deploy/hr-notifications/dispatch-tick.mjs"
-test -f "$new_dir/prisma/migrations/20261107130000_hr_notification_outbox/migration.sql"
+test -f "$new_dir/prisma/migrations-mariadb/20261107130000_hr_notification_outbox/migration.sql"
 install -m 0600 "$old_dir/.env.production.local" "$new_dir/.env.production.local"
 # Keep existing credentials private; generate only the new scheduler token.
 python3 - "$new_dir/.env.production.local" <<'PY'
@@ -78,7 +78,7 @@ cleanup_restore() { db_sql --execute "DROP DATABASE IF EXISTS \`$restore_db\`;" 
 trap cleanup_restore EXIT
 db_sql --execute "CREATE DATABASE \`$restore_db\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 gzip -dc "$backup/hr-database.sql.gz" | db_sql "$restore_db"
-db_sql "$restore_db" < "$new_dir/prisma/migrations/20261107130000_hr_notification_outbox/migration.sql"
+db_sql "$restore_db" < "$new_dir/prisma/migrations-mariadb/20261107130000_hr_notification_outbox/migration.sql"
 test "$(db_sql --execute "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$restore_db' AND table_name IN ('Employee','AttendanceRecord','LeaveRequest','BusinessTrip','HrNotificationOutbox');")" = 5
 cleanup_restore
 trap - EXIT
