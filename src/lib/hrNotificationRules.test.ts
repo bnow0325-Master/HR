@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chatSaved, kstDate, morningWindow, pausedEmployeeRecipients } from "./hrNotificationRules";
+import { chatSaved, kstDate, morningWindow } from "./hrNotificationRules";
 
 test("KST morning and Monday boundaries drive one weekly summary", () => {
   assert.equal(kstDate(new Date("2026-11-08T14:59:00Z")), "2026-11-08");
@@ -22,8 +22,3 @@ test("HTTP 202 is not delivery unless chat saved a message", () => {
   assert.equal(chatSaved({ chatOk: true, messageSeq: 42, roomId: "direct" }), true);
 });
 
-test("existing paused employee receivers are preserved", () => {
-  assert.equal(pausedEmployeeRecipients.has("손근혁"), true);
-  assert.equal(pausedEmployeeRecipients.has("박관식"), true);
-  assert.equal(pausedEmployeeRecipients.has("채민강"), false);
-});

@@ -4,7 +4,7 @@ import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 
 async function authorized() {
   const employee = await getCurrentWorkboardEmployee("any");
-  return employee?.email?.toLowerCase() === CEO_EMAIL && employee.active && employee.workboardEnabled;
+  return employee?.email?.toLowerCase() === CEO_EMAIL && employee.active && employee.workboardEnabled && employee.systemRole === "ADMIN";
 }
 
 export async function GET() {

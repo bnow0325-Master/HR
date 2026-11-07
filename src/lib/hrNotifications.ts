@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { chatSaved, kstTime, pausedEmployeeRecipients } from "@/lib/hrNotificationRules";
+import { chatSaved, kstTime } from "@/lib/hrNotificationRules";
+import { pausedWebhookRecipients } from "@/lib/workboardApprovalNotifications";
 
 export { kstDate, kstTime } from "@/lib/hrNotificationRules";
 
@@ -33,7 +34,7 @@ export async function enqueueAttendanceNotifications(
     title: label,
     message: `${input.employeeName}님 ${label} · ${when}`,
   });
-  if (input.employeeEmail?.trim() && !pausedEmployeeRecipients.has(input.employeeName.trim())) {
+  if (input.employeeEmail?.trim() && !pausedWebhookRecipients.has(input.employeeName.trim())) {
     await enqueue(tx, {
       key: `hr-attendance-self-${input.type}-${input.recordId}`,
       recipientEmail: input.employeeEmail.trim(),
@@ -71,7 +72,7 @@ function webhookConfig() {
 /** The inbound chat API keeps the same key idempotent across retries. */
 export async function dispatchPendingHrNotifications(limit = 10, onlyKey?: string) {
   const config = webhookConfig();
-  if (!config) return { sent: 0, failed: 0, pending: await prisma.hrNotificationOutbox.count({ where: { status: { not: "SENT" } } }), configured: false };
+  if (!config) return { sent: 0, failed: 0, pending: await prisma.hrNotificationOutbox.count({ where: { status: { in: ["PENDING", "SENDING"] } } }), configured: false };
   const now = new Date();
   const rows = await prisma.hrNotificationOutbox.findMany({
     where: { status: { in: ["PENDING", "SENDING"] }, nextAttemptAt: { lte: now },
@@ -122,5 +123,5 @@ export async function dispatchPendingHrNotifications(limit = 10, onlyKey?: strin
       nextAttemptAt: new Date(Date.now() + Math.min(3_600_000, 30_000 * 2 ** Math.min(row.attempts, 7))),
     } });
   }
-  return { sent, failed, pending: await prisma.hrNotificationOutbox.count({ where: { status: { not: "SENT" } } }), configured: true };
+  return { sent, failed, pending: await prisma.hrNotificationOutbox.count({ where: { status: { in: ["PENDING", "SENDING"] } } }), configured: true };
 }

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
   const employee = await getCurrentWorkboardEmployee("any");
-  if (employee?.email?.toLowerCase() !== CEO_EMAIL || !employee.active || !employee.workboardEnabled) {
+  if (employee?.email?.toLowerCase() !== CEO_EMAIL || !employee.active || !employee.workboardEnabled || employee.systemRole !== "ADMIN") {
     redirect("/admin");
   }
   const [pending, sending, sent] = await Promise.all([

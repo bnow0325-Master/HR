@@ -1,5 +1,3 @@
-export const pausedEmployeeRecipients = new Set(["손근혁", "박관식"]);
-
 export function kstDate(date: Date): string {
   return new Date(date.getTime() + 9 * 3_600_000).toISOString().slice(0, 10);
 }

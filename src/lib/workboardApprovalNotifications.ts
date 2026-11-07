@@ -16,7 +16,7 @@ type ApprovalDecisionNotification = ApprovalNotification & {
   reviewerNote: string | null;
 };
 
-const pausedWebhookRecipients = new Set(["손근혁", "박관식"]);
+export const pausedWebhookRecipients = new Set(["손근혁", "박관식"]);
 
 function webhookRecipientPaused(name: string | null | undefined) {
   return Boolean(name && pausedWebhookRecipients.has(name.trim()));
