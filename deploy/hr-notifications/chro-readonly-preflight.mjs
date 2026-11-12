@@ -3,6 +3,7 @@
 // Run through an approved Alpacon agent WorkSession; no writes or message sends.
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { userInfo, hostname } from 'node:os';
 import { pathToFileURL } from 'node:url';
 
 function docker(args) {
@@ -59,14 +60,14 @@ export function aggregateReadiness(hr, chat) {
 }
 
 async function main() {
-  const workSessionId = process.env.ALPACON_WORK_SESSION;
+  const workSessionId = process.argv[2] || process.env.ALPACON_WORK_SESSION;
   if (!/^[a-f0-9-]{36}$/i.test(workSessionId || '')) throw new Error('approved work session required');
   const hr = JSON.parse(docker(['exec', 'bnow-checkinout-app-1', 'node', '-e', hrProbe]));
   const chat = JSON.parse(docker(['exec', 'bnow-chat-server-api-1', 'node', '-e', chatProbe]));
   const format = '{"name":{{json .Name}},"image":{{json .Image}},"imageRef":{{json .Config.Image}},"state":{{json .State.Status}},"workdir":{{json (index .Config.Labels "com.docker.compose.project.working_dir")}}}';
   const releases = docker(['inspect', '--format', format, 'bnow-checkinout-app-1', 'bnow-chat-server-api-1']).trim().split('\n').map(line=>JSON.parse(line));
   // Identifiers/token hashes stay in this process only. stdout is aggregate evidence.
-  process.stdout.write(JSON.stringify({ at: new Date().toISOString(), workSessionId, releases, ...aggregateReadiness(hr, chat) }) + '\n');
+  process.stdout.write(JSON.stringify({ at: new Date().toISOString(), workSessionId, operatorAccount: userInfo().username, host: hostname(), releases, ...aggregateReadiness(hr, chat) }) + '\n');
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {

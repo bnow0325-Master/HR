@@ -27,11 +27,46 @@
   },
   "operatorProbe": {
     "file": "deploy/hr-notifications/chro-readonly-preflight.mjs",
-    "sha256": "5d2f10dbcd9dbfcbe491832d58bb0b30f72536fa98ffbf506f168f1a73441a38",
+    "sha256": "0b0a2326650f078107b0feb968c3327c6bc010c7e219500aa0bb52e1abb649a7",
     "execution": "정식 승인된 운영자가 승인된 Alpacon agent WorkSession과 해당 파일 해시를 명시해 실행. 현재 거부를 다른 계정/승격/agent로 우회 실행하지 않는다.",
-    "commandTemplate": "ALPACON_WORK_SESSION=<approved-session-uuid> node <reviewed-file-path>/chro-readonly-preflight.mjs",
+    "commandTemplate": "node /tmp/bnow-chro-readonly-0b0a2326650f.mjs <approved-work-session-uuid>",
     "localOnlyValidation": "node --check 및 합성 집계 단위검사 통과; 실제 운영 실행 미검증",
-    "outputs": "릴리스 경로/이미지/이미지태그, 활성 HR/수신준비/미연동 인원수, outbox 상태별 건수, 기존 비밀 일치와 공식 목적지 여부, 활성화 설정 여부만 출력. 이메일·메시지·비밀·비밀해시는 최종 출력하지 않음"
+    "outputs": "릴리스 경로/이미지/이미지태그, 활성 HR/수신준비/미연동 인원수, outbox 상태별 건수, 기존 비밀 일치와 공식 목적지 여부, 활성화 설정 여부만 출력. 이메일·메시지·비밀·비밀해시는 최종 출력하지 않음",
+    "canonicalBytes": "UTF-8 without BOM, LF. Git blob / delivered file exact bytes; do not convert line endings.",
+    "deliveryAndExecution": {
+      "localDeliveryFile": "C:\\Users\\Elon Choo PC\\Desktop\\생성문서\\AI임원_CHRO_알림_구현증빙_20261113\\chro-readonly-preflight.mjs",
+      "remoteStagingPath": "/tmp/bnow-chro-readonly-0b0a2326650f.mjs",
+      "formalAccount": "대표가 정식 운영자로 지정한 기존 승인 계정. 실제 이름은 WorkSession target_account_username에 먼저 고정한다. 새 계정/권한/sudo 정책을 만들지 않는다.",
+      "formalWorkSession": "새로운 명시 승인 agent WorkSession의 scopes command+webftp, server 1-ubuntu, 실제 운영자 계정. 현재 닫힌 거부 세션9290e740을 재사용하거나 다른 자격으로 우회하지 않는다.",
+      "interpreter": "운영자가 command -v node로 확인한 실제 절대 Node 경로. /usr/bin/node는 존재가 확인된 경우만 사용하며 없으면 설치/변형 실행하지 않고 출력 제공 방식으로 전환.",
+      "verifiedFileToolExample": {
+        "tool": "Alpacon execute_file",
+        "workspace": "livecare",
+        "region": "ap1",
+        "server_id": "a5eeaf1f-cf79-47ef-9066-3492b52ed72b",
+        "work_session_id": "<formal-approved-session-uuid>",
+        "username": "<formally-named-existing-operator>",
+        "path": "/tmp/bnow-chro-readonly-0b0a2326650f.mjs",
+        "interpreter": "<verified-absolute-node-path>",
+        "args": [
+          "<same-formal-approved-session-uuid>"
+        ],
+        "content": "<exact UTF-8 LF file bytes whose SHA-256 is 0b0a2326650f078107b0feb968c3327c6bc010c7e219500aa0bb52e1abb649a7>",
+        "write_file": true,
+        "overwrite": false,
+        "purpose": "현재 HR/비노우톡 릴리스 및 직원 수신준비·outbox 집계를 읽기 확인; 쓰기/전송/설정변경 없음"
+      },
+      "submissionOrder": [
+        "대표가 운영자/범위 명시 지시 또는 운영자가 이미 승인된 절차의 결과만 제공",
+        "정식 WorkSession active/계정/서버 대조",
+        "로컬 파일 SHA-256 대조",
+        "execute_file write_file=true로 정확한 파일 임시배치+검토(기존파일 덮어쓰기 금지)",
+        "verified-file 결과의 해시/실행계정/세션/종료코드/집계 출력 보존",
+        "권한거부나 해시불일치면 즉시 중단, 재자격/변형명령 우회 금지",
+        "운영자가 본인 세션만 종료; 업로드된 비밀 없는 도구 사본은 해당 절차에 따라 보존/정리"
+      ],
+      "expectedResult": "exit0의 집계 JSON에 at, workSessionId, operatorAccount, host, releases 및 readiness/outbox count. 실패 exit1은 비밀 없는 unavailable 문구이며 자료 미확인으로 남긴다."
+    }
   },
   "preflightPassCriteria": [
     "두 운영 컨테이너의 실제 이미지/태그/Compose 작업경로와 최신 배포기록 일치. 현재 값은 미확인이다.",
