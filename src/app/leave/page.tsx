@@ -433,7 +433,7 @@ export default function LeavePage() {
                 <div className="rounded-lg border border-emerald-400 bg-white p-3">사용 가능 <strong className="block text-lg">{specialSummary.remainingDays}일</strong></div>
               </div>
               <div className="mt-3 divide-y divide-emerald-200">{specialGrants.map((grant) => <p key={grant.id} className="py-2 text-sm text-emerald-900">근거일 {formatDate(grant.sourceWorkDate)} · {grant.reason}</p>)}</div>
-              <p className="mt-2 text-sm text-emerald-800">휴일근로 임금 정산과는 별도입니다.</p>
+              <p className="mt-2 text-sm text-emerald-800">이 특별휴가는 휴일근로 임금 정산과 별개로 관리됩니다. 임금 정산 여부는 별도로 확인합니다.</p>
             </section>
           )}
 
