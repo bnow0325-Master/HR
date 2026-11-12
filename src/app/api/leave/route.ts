@@ -6,6 +6,7 @@ import {
   minutesToDays,
   startOfKstDate,
   statutoryAnnualLeaveDays,
+  remainingAnnualLeaveMinutes,
 } from "@/lib/annualLeave";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 import { notifyAdminsAboutApprovalRequest } from "@/lib/workboardApprovalNotifications";
@@ -176,7 +177,6 @@ async function buildSummary(employeeId: string) {
       + sourceBalance.adjustedMinutes
     : null;
   const grantedMinutes = sourceGrantedMinutes ?? statutoryGrantedDays * employee.workMinutesPerDay;
-  const sourceRemainingMinutes = sourceBalance?.remainingMinutes ?? grantedMinutes - approvedMinutes;
 
   return {
     employee,
@@ -192,7 +192,7 @@ async function buildSummary(employeeId: string) {
         employee.workMinutesPerDay,
       ),
       remainingDays: minutesToDays(
-        sourceRemainingMinutes - approvedMinutes - pendingMinutes,
+        remainingAnnualLeaveMinutes(grantedMinutes, sourceBalance?.usedMinutes ?? 0, approvedMinutes, pendingMinutes),
         employee.workMinutesPerDay,
       ),
       periodStart: period.start,

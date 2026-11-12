@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       const pendingMinutes = included.filter((item) => item.status === "PENDING").reduce((sum, item) => sum + item.unitsMinutes, 0);
       const grantedMinutes = source ? source.annualGrantedMinutes + source.firstYearGrantedMinutes + source.firstYearCarryoverMinutes + source.carryoverMinutes + source.adjustedMinutes : statutoryAnnualLeaveDays(employee.hireDate, now) * employee.workMinutesPerDay;
       const unitsMinutes = leaveType === "ANNUAL" ? employee.workMinutesPerDay : Math.round(employee.workMinutesPerDay / 2);
-      const balance = adminLeaveBalance({ grantedMinutes, usedMinutes: source?.usedMinutes ?? 0, remainingMinutes: source?.remainingMinutes ?? grantedMinutes, approvedMinutes, pendingMinutes, workMinutesPerDay: employee.workMinutesPerDay }, unitsMinutes);
+      const balance = adminLeaveBalance({ grantedMinutes, usedMinutes: source?.usedMinutes ?? 0, approvedMinutes, pendingMinutes, workMinutesPerDay: employee.workMinutesPerDay }, unitsMinutes);
       if (!balance.canRegister) throw new Error("LIMIT");
       const created = await tx.leaveRequest.create({ data: { employeeId, leaveDate, leaveType, unitsMinutes, status: "APPROVED", reviewedAt: now, reviewedByEmail: admin.email, reviewerNote: "대표이사 직접 등록", reason: null }, select: { id: true } });
       await tx.approvalAudit.create({ data: { employeeId, requestKind: "leave", requestId: created.id, action: "ADMIN_REGISTER", toStatus: "APPROVED", actorEmail: admin.email, actorName: admin.name, note: "대표이사 요청에 따른 직접 등록" } });
