@@ -40,7 +40,7 @@ for(const [age,status]of[[60000,409],[60001,200]])test(`same-type duplicate guar
 test('HTTP 202 without chat storage remains pending and keeps the same delivery key',async()=>{
   const h=await harness();await h.post({type:'IN'});h.state.respond=()=>Response.json({chatOk:false,messageSeq:null},{status:202});
   const key=h.state.outbox[0].idempotencyKey;await(await h.api('@/lib/hrNotifications')).dispatchPendingHrNotifications(1);
-  assert.equal(h.state.outbox[0].status,'PENDING');assert.equal(h.state.outbox[0].attempts,1);assert.equal(h.state.fetches[0].idempotencyKey,key);
+  assert.equal(h.state.outbox[0].status,'CHRO_PENDING');assert.equal(h.state.outbox[0].attempts,1);assert.equal(h.state.fetches[0].idempotencyKey,key);
 });
 test('concurrent workers claim one pending record and save the private room receipt',async()=>{
   const h=await harness();await h.post({type:'IN'});const api=await h.api('@/lib/hrNotifications');
@@ -49,16 +49,16 @@ test('concurrent workers claim one pending record and save the private room rece
   assert.equal(h.state.outbox[0].remoteRoomId,'representative-direct-test');assert.equal(h.state.outbox[0].remoteMessageSeq,42);
 });
 test('expired sending leases recover and interrupted acknowledgements retry with the same key',async()=>{
-  const h=await harness();await h.post({type:'IN'});const row=h.state.outbox[0];row.status='SENDING';h.state.failSentCommit=true;
+  const h=await harness();await h.post({type:'IN'});const row=h.state.outbox[0];row.status='CHRO_SENDING';h.state.failSentCommit=true;
   const api=await h.api('@/lib/hrNotifications');await api.dispatchPendingHrNotifications(1);
-  assert.equal(row.status,'PENDING');row.nextAttemptAt=new Date(h.now-1);await api.dispatchPendingHrNotifications(1);
+  assert.equal(row.status,'CHRO_PENDING');row.nextAttemptAt=new Date(h.now-1);await api.dispatchPendingHrNotifications(1);
   assert.equal(row.status,'SENT');assert.equal(h.state.fetches.length,2);
   assert.equal(h.state.fetches[0].idempotencyKey,h.state.fetches[1].idempotencyKey);
 });
 test('unconfigured chat does not discard the durable outbox',async()=>{
   const h=await harness();await h.post({type:'IN'});h.env.WORKBOARD_STAFF_CHAT_WEBHOOK_TOKEN='';
   const result=await(await h.api('@/lib/hrNotifications')).dispatchPendingHrNotifications(1);
-  assert.equal(result.configured,false);assert.equal(h.state.fetches.length,0);assert.equal(h.state.outbox[0].status,'PENDING');
+  assert.equal(result.configured,false);assert.equal(h.state.fetches.length,0);assert.equal(h.state.outbox[0].status,'CHRO_PENDING');
 });
 test('Monday summary is weekly only, crosses years, and is idempotent',async()=>{
   const h=await harness({now:Date.parse('2026-12-28T00:00:00Z')});
@@ -139,7 +139,7 @@ test('CHRO activation is explicit and previously stored SENT messages are never 
   const api=await h.api('@/lib/hrNotifications');
   h.state.outbox.push({id:'old-sent',idempotencyKey:'old-sent-key',status:'SENT',attempts:1,nextAttemptAt:new Date(h.now-1),createdAt:new Date(h.now-5000),remoteMessageSeq:38});
   h.env.HR_CHRO_NOTIFICATIONS_START_AT='';
-  await api.dispatchPendingHrNotifications(10);assert.equal(h.state.fetches.length,0);assert.equal(h.state.outbox[0].status,'PENDING');
+  await api.dispatchPendingHrNotifications(10);assert.equal(h.state.fetches.length,0);assert.equal(h.state.outbox[0].status,'CHRO_PENDING');
   h.env.HR_CHRO_NOTIFICATIONS_START_AT=new Date(h.now-1000).toISOString();
   await api.dispatchPendingHrNotifications(10);
   assert.equal(h.state.fetches.length,2);assert.equal(h.state.outbox[2].remoteMessageSeq,38);
@@ -204,5 +204,15 @@ test('inactive chat recipient is surfaced for review instead of retrying forever
   const again=await harness();await again.post({type:'IN'});
   again.state.respond=()=>Response.json({error:'Not Found'},{status:404});
   await(await again.api('@/lib/hrNotifications')).dispatchPendingHrNotifications(1);
-  assert.equal(again.state.outbox[0].status,'PENDING');
+  assert.equal(again.state.outbox[0].status,'CHRO_PENDING');
+});
+
+test('a rolled-back legacy dispatcher cannot reinterpret new CHRO pending or sending rows',async()=>{
+  const h=await harness();await h.post({type:'IN'});
+  assert.ok(h.state.outbox.every(r=>r.status==='CHRO_PENDING'));
+  h.state.outbox[0].status='CHRO_SENDING';
+  const legacyRows=await h.db.hrNotificationOutbox.findMany({where:{status:{in:['PENDING','SENDING']},nextAttemptAt:{lte:new Date(h.now)}},take:100});
+  assert.equal(legacyRows.length,0);
+  await(await h.api('@/lib/hrNotifications')).dispatchPendingHrNotifications(10);
+  assert.ok(h.state.outbox.every(r=>r.status==='SENT'));
 });

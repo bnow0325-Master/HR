@@ -38,6 +38,8 @@ test('actual MariaDB row locks serialize concurrent attendance requests and pers
       `hr-chro-v1:hr-attendance-ceo-IN-${records[0].id}`,`hr-chro-v1:hr-attendance-self-IN-${records[0].id}`,
     ]}}});
     assert.equal(rows.length,2);assert.deepEqual(rows.map(r=>r.audience).sort(),['operations','work']);
+    assert.ok(rows.every(r=>r.status==='CHRO_PENDING'));
+    assert.equal(await db.hrNotificationOutbox.count({where:{id:{in:rows.map(r=>r.id)},status:{in:['PENDING','SENDING']}}}),0);
     assert.equal(rows.find(r=>r.audience==='operations').recipientEmail,'executive@example.test');
     assert.equal(rows.find(r=>r.audience==='work').recipientEmail,`${id}@example.test`);
     assert.equal(h.state.fetches.length,0);

@@ -39,7 +39,7 @@ export async function enqueueDueMissingCheckouts(now = new Date()) {
       const prefix = days === 1 ? `어제(${labelDate})` : labelDate;
       const saved = await prisma.hrNotificationOutbox.createMany({ data: [{
         idempotencyKey: `${CHRO_KEY_PREFIX}missing-out:${workDate}:${employee.id}`,
-        recipientEmail: employee.email.trim().toLowerCase(), audience: "work", senderName: CHRO_SENDER_NAME,
+        recipientEmail: employee.email.trim().toLowerCase(), audience: "work", senderName: CHRO_SENDER_NAME, status: "CHRO_PENDING",
         title: "퇴근 기록 확인", message: `${prefix} 퇴근 기록이 확인되지 않았습니다. 근무기록을 확인해 주세요.`,
       }], skipDuplicates: true });
       queued += saved.count;

@@ -17,6 +17,7 @@ async function enqueue(
     recipientEmail: input.recipientEmail.toLowerCase(),
     audience: input.audience,
     senderName: CHRO_SENDER_NAME,
+    status: "CHRO_PENDING",
     title: input.title,
     message: input.message,
   } });
@@ -105,10 +106,10 @@ async function eventStillCurrent(key: string, recipientEmail: string) {
 /** The inbound chat API keeps the same key idempotent across retries. */
 export async function dispatchPendingHrNotifications(limit = 10, onlyKey?: string) {
   const config = webhookConfig();
-  if (!config) return { sent: 0, failed: 0, pending: await prisma.hrNotificationOutbox.count({ where: { status: { in: ["PENDING", "SENDING"] } } }), configured: false };
+  if (!config) return { sent: 0, failed: 0, pending: await prisma.hrNotificationOutbox.count({ where: { status: { in: ["PENDING", "SENDING", "CHRO_PENDING", "CHRO_SENDING"] } } }), configured: false };
   const now = new Date();
   const rows = await prisma.hrNotificationOutbox.findMany({
-    where: { status: { in: ["PENDING", "SENDING"] }, nextAttemptAt: { lte: now },
+    where: { status: { in: ["PENDING", "SENDING", "CHRO_PENDING", "CHRO_SENDING"] }, nextAttemptAt: { lte: now },
       ...(onlyKey ? { idempotencyKey: onlyKey } : {}) },
     orderBy: { createdAt: "asc" }, take: Math.min(Math.max(limit, 1), 100),
   });
@@ -120,7 +121,7 @@ export async function dispatchPendingHrNotifications(limit = 10, onlyKey?: strin
     if (chro && (!activation || now < activation)) continue;
     const claimed = await prisma.hrNotificationOutbox.updateMany({
       where: { id: row.id, status: row.status, nextAttemptAt: { lte: now } },
-      data: { status: "SENDING", attempts: { increment: 1 }, nextAttemptAt: new Date(Date.now() + 120_000) },
+      data: { status: chro ? "CHRO_SENDING" : "SENDING", attempts: { increment: 1 }, nextAttemptAt: new Date(Date.now() + 120_000) },
     });
     if (claimed.count !== 1) continue;
     if (chro && (row.createdAt < activation! || !await eventStillCurrent(row.idempotencyKey, row.recipientEmail))) {
@@ -173,9 +174,9 @@ export async function dispatchPendingHrNotifications(limit = 10, onlyKey?: strin
     } catch { error = "webhook unavailable"; }
     failed++;
     await prisma.hrNotificationOutbox.update({ where: { id: row.id }, data: {
-      status: "PENDING", lastError: error,
+      status: chro ? "CHRO_PENDING" : "PENDING", lastError: error,
       nextAttemptAt: new Date(Date.now() + Math.min(3_600_000, 30_000 * 2 ** Math.min(row.attempts, 7))),
     } });
   }
-  return { sent, failed, pending: await prisma.hrNotificationOutbox.count({ where: { status: { in: ["PENDING", "SENDING"] } } }), configured: true, chroConfigured: Boolean(hrChroActivation()) };
+  return { sent, failed, pending: await prisma.hrNotificationOutbox.count({ where: { status: { in: ["PENDING", "SENDING", "CHRO_PENDING", "CHRO_SENDING"] } } }), configured: true, chroConfigured: Boolean(hrChroActivation()) };
 }

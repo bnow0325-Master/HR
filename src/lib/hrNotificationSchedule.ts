@@ -47,7 +47,7 @@ export async function enqueueDueHrSummary(now = new Date()) {
   const result = await prisma.hrNotificationOutbox.createMany({
     data: [{
       idempotencyKey: `${CHRO_KEY_PREFIX}hr-summary-ceo-${monday ? "week" : "day"}-${date}`,
-      recipientEmail: CEO_EMAIL, audience: "operations", senderName: CHRO_SENDER_NAME, title, message,
+      recipientEmail: CEO_EMAIL, audience: "operations", senderName: CHRO_SENDER_NAME, status: "CHRO_PENDING", title, message,
     }], skipDuplicates: true,
   });
   return { due: true, date, queued: result.count === 1 };

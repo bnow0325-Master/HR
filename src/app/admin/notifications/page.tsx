@@ -13,8 +13,8 @@ export default async function NotificationsPage() {
     redirect("/admin");
   }
   const [pending, sending, sent, blocked] = await Promise.all([
-    prisma.hrNotificationOutbox.count({ where: { status: "PENDING" } }),
-    prisma.hrNotificationOutbox.count({ where: { status: "SENDING" } }),
+    prisma.hrNotificationOutbox.count({ where: { status: { in: ["PENDING", "CHRO_PENDING"] } } }),
+    prisma.hrNotificationOutbox.count({ where: { status: { in: ["SENDING", "CHRO_SENDING"] } } }),
     prisma.hrNotificationOutbox.count({ where: { status: "SENT" } }),
     prisma.hrNotificationOutbox.count({ where: { status: "BLOCKED" } }),
   ]);

@@ -15,7 +15,7 @@
     "test:identity": "tsx --test src/lib/companyIdentity.test.ts src/lib/companyOidc.test.ts src/lib/companyAuthRoutes.test.ts src/lib/customerChatAccess.test.ts src/lib/workboardHandoff.test.ts",
     "test:database": "tsx --test src/lib/mariaDbConfig.test.ts src/lib/employeeDirectory.test.ts src/lib/annualLeave.test.ts",
     "test:profile-photo": "tsx --test src/lib/profilePhoto.test.ts",
-    "test:notifications": "tsx --test src/lib/hrNotificationRules.test.ts src/lib/hrNotifications.test.ts src/lib/hrChroTransport.test.ts src/lib/hrMissingCheckoutRules.test.ts && node --experimental-vm-modules --test scripts/hr-notifications.integration.test.mjs scripts/hr-notifications.mariadb.test.mjs && node --test deploy/hr-notifications/dispatch-tick.test.mjs",
+    "test:notifications": "tsx --test src/lib/hrNotificationRules.test.ts src/lib/hrNotifications.test.ts src/lib/hrChroTransport.test.ts src/lib/hrMissingCheckoutRules.test.ts && node --experimental-vm-modules --test scripts/hr-notifications.integration.test.mjs scripts/hr-notifications.mariadb.test.mjs && node --test deploy/hr-notifications/dispatch-tick.test.mjs deploy/hr-notifications/chro-readonly-preflight.test.mjs",
     "identity:reconcile": "tsx scripts/reconcile-company-identity.ts",
     "db:migrate-data:mariadb": "tsx scripts/migrate-postgres-to-mariadb.ts",
     "check": "npm run typecheck && npm run build",

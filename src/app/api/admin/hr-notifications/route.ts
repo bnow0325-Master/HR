@@ -11,8 +11,8 @@ async function authorized() {
 export async function GET() {
   if (!(await authorized())) return Response.json({ error: "forbidden" }, { status: 403 });
   const [pending, sending, sent, blocked, skipped] = await Promise.all([
-    prisma.hrNotificationOutbox.count({ where: { status: "PENDING" } }),
-    prisma.hrNotificationOutbox.count({ where: { status: "SENDING" } }),
+    prisma.hrNotificationOutbox.count({ where: { status: { in: ["PENDING", "CHRO_PENDING"] } } }),
+    prisma.hrNotificationOutbox.count({ where: { status: { in: ["SENDING", "CHRO_SENDING"] } } }),
     prisma.hrNotificationOutbox.count({ where: { status: "SENT" } }),
     prisma.hrNotificationOutbox.count({ where: { status: "BLOCKED" } }),
     prisma.hrNotificationOutbox.count({ where: { status: "SKIPPED" } }),
@@ -26,7 +26,7 @@ export async function POST() {
   const key = `${CHRO_KEY_PREFIX}hr-ceo-connection-${kstDate(new Date())}`;
   await prisma.hrNotificationOutbox.createMany({ data: [{
     idempotencyKey: key, recipientEmail: CEO_EMAIL, audience: "operations",
-    senderName: CHRO_SENDER_NAME, title: "인사 알림 연결 확인",
+    senderName: CHRO_SENDER_NAME, status: "CHRO_PENDING", title: "인사 알림 연결 확인",
     message: "대표 전용 인사 알림 채팅 연결을 확인합니다. 실제 출퇴근·휴가·출장 기록은 생성되지 않았습니다.",
   }], skipDuplicates: true });
   const delivery = await dispatchPendingHrNotifications(1, key);
