@@ -545,6 +545,12 @@ export default async function AdminPage({
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Link
+            href="/admin/leave-registration"
+            className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 font-semibold text-blue-800 hover:bg-blue-100"
+          >
+            직원 휴가 직접 등록
+          </Link>
+          <Link
             href="/admin/approvals"
             className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 font-semibold text-amber-800 hover:bg-amber-100"
           >
