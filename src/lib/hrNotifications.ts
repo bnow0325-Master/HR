@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { chatSaved, kstTime } from "@/lib/hrNotificationRules";
+import { chatSaved, kstTime, privateHrChannel } from "@/lib/hrNotificationRules";
 import { pausedWebhookRecipients } from "@/lib/workboardApprovalNotifications";
 
 export { kstDate, kstTime } from "@/lib/hrNotificationRules";
@@ -100,6 +100,7 @@ export async function dispatchPendingHrNotifications(limit = 10, onlyKey?: strin
             idempotencyKey: row.idempotencyKey, recipientEmail: row.recipientEmail,
             audience: row.audience, senderName: row.senderName, title: row.title,
             message: row.message, type: "confirm_request",
+            ...(privateHrChannel(row, CEO_EMAIL) ? { channel: "hr" } : {}),
           }),
           signal: controller.signal,
         });
