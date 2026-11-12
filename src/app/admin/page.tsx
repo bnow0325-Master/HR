@@ -6,6 +6,7 @@ import {
   currentLeavePeriod,
   minutesToDays,
   startOfKstDate,
+  remainingAnnualLeaveMinutes,
   statutoryAnnualLeaveDays,
 } from "@/lib/annualLeave";
 import { prisma } from "@/lib/prisma";
@@ -405,9 +406,12 @@ export default async function AdminPage({
           + sourceBalance.carryoverMinutes
           + sourceBalance.adjustedMinutes
         : null;
-      const remainingMinutes = sourceBalance
-        ? sourceBalance.remainingMinutes - approvedMinutes - pendingMinutes
-        : Math.max(0, grantedMinutes - approvedMinutes - pendingMinutes);
+      const remainingMinutes = remainingAnnualLeaveMinutes(
+        sourceGrantedMinutes ?? grantedMinutes,
+        sourceBalance?.usedMinutes ?? 0,
+        approvedMinutes,
+        pendingMinutes,
+      );
       leave = {
         grantedDays: minutesToDays(
           sourceGrantedMinutes ?? grantedMinutes,

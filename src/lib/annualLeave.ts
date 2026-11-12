@@ -18,6 +18,16 @@ function anniversary(hireDate: Date, year: number) {
 // BNOW welfare policy allows advance annual-leave requests; settlement occurs at departure.
 export const MAX_NEGATIVE_LEAVE_DAYS = 12;
 
+/** Reconcile the displayed balance to the same granted and used totals. */
+export function remainingAnnualLeaveMinutes(
+  grantedMinutes: number,
+  sourceUsedMinutes: number,
+  approvedMinutes: number,
+  pendingMinutes: number,
+) {
+  return grantedMinutes - sourceUsedMinutes - approvedMinutes - pendingMinutes;
+}
+
 export function canRequestAnnualLeave(
   remainingMinutes: number,
   requestedMinutes: number,
