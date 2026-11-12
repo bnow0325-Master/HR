@@ -20,3 +20,16 @@ export function chatSaved(value: unknown): value is { chatOk: true; messageSeq: 
   const item = value as { chatOk?: unknown; messageSeq?: unknown };
   return item.chatOk === true && typeof item.messageSeq === "number" && Number.isSafeInteger(item.messageSeq) && item.messageSeq > 0;
 }
+
+/** Only the representative's attendance events belong in the private HR room. */
+export function privateHrChannel(row: {
+  idempotencyKey: string;
+  recipientEmail: string;
+  audience: string;
+}, representativeEmail: string): "hr" | undefined {
+  return row.audience === "operations" &&
+    row.recipientEmail.trim().toLowerCase() === representativeEmail.trim().toLowerCase() &&
+    /^hr-attendance-ceo-(IN|OUT|CANCEL_OUT)-/.test(row.idempotencyKey)
+      ? "hr"
+      : undefined;
+}
