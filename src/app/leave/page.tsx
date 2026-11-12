@@ -24,7 +24,7 @@ type Employee = {
 type LeaveRequest = {
   id: string;
   employeeId?: string;
-  leaveType: "ANNUAL" | "AM_HALF" | "PM_HALF";
+  leaveType: "ANNUAL" | "AM_HALF" | "PM_HALF" | "SPECIAL";
   leaveDate: string;
   unitsMinutes: number;
   reason: string | null;
@@ -40,6 +40,9 @@ type LeaveSummary = {
   periodStart: string;
   periodEnd: string;
 };
+
+type SpecialLeaveSummary = { grantedDays: number; usedDays: number; pendingDays: number; remainingDays: number };
+type SpecialLeaveGrant = { id: string; sourceWorkDate: string; unitsMinutes: number; reason: string; createdAt: string };
 
 type NaverWorksLeaveHistory = {
   id: string;
@@ -98,6 +101,7 @@ function formatDate(value: string | Date) {
 function leaveTypeLabel(type: LeaveRequest["leaveType"]) {
   if (type === "AM_HALF") return "오전 반차";
   if (type === "PM_HALF") return "오후 반차";
+  if (type === "SPECIAL") return "유급 특별휴가";
   return "연차";
 }
 
@@ -149,10 +153,10 @@ function buildDevelopmentSummary(
     );
   });
   const approvedMinutes = periodRequests
-    .filter((request) => request.status === "APPROVED")
+    .filter((request) => request.leaveType !== "SPECIAL" && request.status === "APPROVED")
     .reduce((sum, request) => sum + request.unitsMinutes, 0);
   const pendingMinutes = periodRequests
-    .filter((request) => request.status === "PENDING")
+    .filter((request) => request.leaveType !== "SPECIAL" && request.status === "PENDING")
     .reduce((sum, request) => sum + request.unitsMinutes, 0);
   const grantedDays = statutoryAnnualLeaveDays(hireDate, now);
   const grantedMinutes = grantedDays * employee.workMinutesPerDay;
@@ -183,6 +187,8 @@ export default function LeavePage() {
   const isDevelopment = process.env.NODE_ENV === "development";
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [summary, setSummary] = useState<LeaveSummary | null>(null);
+  const [specialSummary, setSpecialSummary] = useState<SpecialLeaveSummary | null>(null);
+  const [specialGrants, setSpecialGrants] = useState<SpecialLeaveGrant[]>([]);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [naverWorksHistory, setNaverWorksHistory] = useState<NaverWorksLeaveHistory[]>([]);
   const [sourceBalance, setSourceBalance] = useState<SourceBalance | null>(null);
@@ -218,6 +224,8 @@ export default function LeavePage() {
       setEmployee(matched);
       setRequests(result?.requests ?? []);
       setSummary(result?.summary ?? null);
+      setSpecialSummary(null);
+      setSpecialGrants([]);
       setNaverWorksHistory([]);
       setSourceBalance(null);
       setSourceLedgerHistory([]);
@@ -236,6 +244,8 @@ export default function LeavePage() {
       }
       setEmployee(data.employee);
       setSummary(data.summary);
+      setSpecialSummary(data.specialSummary ?? null);
+      setSpecialGrants(data.specialGrants ?? []);
       setRequests(data.requests);
       setNaverWorksHistory(data.naverWorksHistory ?? []);
       setSourceBalance(data.sourceBalance ?? null);
@@ -259,7 +269,7 @@ export default function LeavePage() {
     }
 
     const unitsMinutes =
-      leaveType === "ANNUAL"
+      leaveType === "ANNUAL" || leaveType === "SPECIAL"
         ? employee.workMinutesPerDay
         : Math.round(employee.workMinutesPerDay / 2);
 
@@ -277,14 +287,14 @@ export default function LeavePage() {
       const remainingMinutes = Math.round(
         summary.remainingDays * employee.workMinutesPerDay,
       );
-      if (!canRequestAnnualLeave(
+      if (leaveType === "SPECIAL" || !canRequestAnnualLeave(
         remainingMinutes,
         unitsMinutes,
         employee.workMinutesPerDay,
       )) {
         setMessage({
           ok: false,
-          text: "휴가 신청은 잔여 연차 -12일까지 가능합니다.",
+          text: leaveType === "SPECIAL" ? "미리보기에서는 유급 특별휴가를 신청할 수 없습니다." : "휴가 신청은 잔여 연차 -12일까지 가능합니다.",
         });
         return;
       }
@@ -356,7 +366,7 @@ export default function LeavePage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">휴가 관리</h1>
           <p className="mt-2 text-sm text-slate-500">
-            연차 현황을 한눈에 확인하고 휴가를 신청할 수 있습니다.
+            연차와 별도 유급 특별휴가 현황을 확인하고 휴가를 신청할 수 있습니다.
           </p>
         </div>
         <Link
@@ -412,6 +422,20 @@ export default function LeavePage() {
               accent
             />
           </section>
+
+          {specialSummary && specialSummary.grantedDays > 0 && (
+            <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+              <h2 className="text-lg font-bold text-emerald-950">유급 특별휴가 · 연차 별도</h2>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-emerald-950 sm:grid-cols-4">
+                <div className="rounded-lg bg-white p-3">부여 <strong className="block text-lg">{specialSummary.grantedDays}일</strong></div>
+                <div className="rounded-lg bg-white p-3">사용 <strong className="block text-lg">{specialSummary.usedDays}일</strong></div>
+                <div className="rounded-lg bg-white p-3">승인 대기 <strong className="block text-lg">{specialSummary.pendingDays}일</strong></div>
+                <div className="rounded-lg border border-emerald-400 bg-white p-3">사용 가능 <strong className="block text-lg">{specialSummary.remainingDays}일</strong></div>
+              </div>
+              <div className="mt-3 divide-y divide-emerald-200">{specialGrants.map((grant) => <p key={grant.id} className="py-2 text-sm text-emerald-900">근거일 {formatDate(grant.sourceWorkDate)} · {grant.reason}</p>)}</div>
+              <p className="mt-2 text-sm text-emerald-800">휴일근로 임금 정산과는 별도입니다.</p>
+            </section>
+          )}
 
           {sourceBalance && (
             <section className="mb-6 overflow-hidden rounded-2xl border border-blue-100 bg-blue-50/40">
@@ -479,8 +503,7 @@ export default function LeavePage() {
             >
               <h2 className="text-xl font-bold text-slate-900">휴가 신청</h2>
               <p className="mt-1 text-sm text-slate-500">
-                휴가 종류와 날짜를 선택해 신청하세요. 잔여 연차가 -12일이 될
-                때까지 신청할 수 있습니다.
+                {leaveType === "SPECIAL" ? "특별휴가는 별도 잔여일 범위에서 신청할 수 있습니다." : "휴가 종류와 날짜를 선택해 신청하세요. 잔여 연차가 -12일이 될 때까지 신청할 수 있습니다."}
               </p>
               <div className="mt-4 flex flex-col gap-3">
                 <label className="text-sm font-medium text-slate-600">
@@ -497,6 +520,7 @@ export default function LeavePage() {
                     <option value="ANNUAL">연차</option>
                     <option value="AM_HALF">오전 반차</option>
                     <option value="PM_HALF">오후 반차</option>
+                    {specialSummary && specialSummary.remainingDays > 0 && <option value="SPECIAL">유급 특별휴가 1일</option>}
                   </select>
                 </label>
                 <label className="text-sm font-medium text-slate-600">

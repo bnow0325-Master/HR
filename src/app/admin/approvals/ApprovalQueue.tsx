@@ -22,7 +22,7 @@ type QueueItem = {
 };
 type LeaveRequest = {
   id: string;
-  leaveType: "ANNUAL" | "AM_HALF" | "PM_HALF";
+  leaveType: "ANNUAL" | "AM_HALF" | "PM_HALF" | "SPECIAL";
   leaveDate: string;
   unitsMinutes: number;
   reason: string | null;
@@ -73,6 +73,7 @@ function formatDateTime(value: string) {
 function leaveTypeLabel(type: LeaveRequest["leaveType"]) {
   if (type === "AM_HALF") return "오전 반차";
   if (type === "PM_HALF") return "오후 반차";
+  if (type === "SPECIAL") return "유급 특별휴가";
   return "연차";
 }
 

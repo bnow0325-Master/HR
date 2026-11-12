@@ -36,6 +36,7 @@ model Employee {
   updatedAt                DateTime                  @default(now()) @updatedAt
   records                  AttendanceRecord[]
   leaveRequests            LeaveRequest[]
+  specialLeaveGrants       SpecialLeaveGrant[]
   businessTrips            BusinessTrip[]
   approvalAudits           ApprovalAudit[]
   approvalDocuments        ApprovalDocument[]
@@ -184,6 +185,22 @@ model LeaveRequest {
 
   @@index([employeeId, leaveDate])
   @@index([status, leaveDate])
+}
+
+// Company-funded paid leave credits. These do not change statutory annual leave
+// or replace holiday-work wages unless a separate lawful agreement provides so.
+model SpecialLeaveGrant {
+  id             String   @id @default(cuid())
+  employee       Employee @relation(fields: [employeeId], references: [id])
+  employeeId     String
+  sourceWorkDate DateTime @db.Date
+  unitsMinutes   Int
+  reason         String   @db.Text
+  grantedByEmail String
+  createdAt      DateTime @default(now())
+
+  @@unique([employeeId, sourceWorkDate])
+  @@index([employeeId, createdAt])
 }
 
 model BusinessTrip {

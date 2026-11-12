@@ -114,7 +114,7 @@ export async function PATCH(request: Request) {
           note: reviewerNote,
         },
       });
-      const leaveLabel = leave.leaveType === "ANNUAL" ? "연차" : leave.leaveType === "AM_HALF" ? "오전 반차" : "오후 반차";
+      const leaveLabel = leave.leaveType === "SPECIAL" ? "유급 특별휴가" : leave.leaveType === "ANNUAL" ? "연차" : leave.leaveType === "AM_HALF" ? "오전 반차" : "오후 반차";
       const description = `${leave.leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveLabel}`;
       if (decision === "APPROVED") await enqueueApprovedAbsenceNotification(tx, {
         kind: "leave", requestId: leave.id, employeeName: leave.employee.name, description,
