@@ -12,7 +12,7 @@ import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 import { notifyAdminsAboutApprovalRequest } from "@/lib/workboardApprovalNotifications";
 
 type LeaveBody = {
-  leaveType?: "ANNUAL" | "AM_HALF" | "PM_HALF";
+  leaveType?: "ANNUAL" | "AM_HALF" | "PM_HALF" | "SPECIAL";
   leaveDate?: string;
   reason?: string;
 };
@@ -118,7 +118,7 @@ async function buildSummary(employeeId: string) {
 
   const asOf = new Date();
   const period = currentLeavePeriod(employee.hireDate, asOf);
-  const [requests, sourceBalance, sourceLedgerHistory, sourceHistory] = await prisma.$transaction([
+  const [requests, sourceBalance, sourceLedgerHistory, sourceHistory, specialGrants, specialRequests] = await prisma.$transaction([
     prisma.leaveRequest.findMany({
       where: {
         employeeId,
@@ -155,6 +155,14 @@ async function buildSummary(employeeId: string) {
       },
       orderBy: [{ requestedOn: "desc" }, { importedAt: "desc" }],
     }),
+    prisma.specialLeaveGrant.findMany({
+      where: { employeeId }, orderBy: { createdAt: "desc" },
+      select: { id: true, sourceWorkDate: true, unitsMinutes: true, reason: true, createdAt: true },
+    }),
+    prisma.leaveRequest.findMany({
+      where: { employeeId, leaveType: "SPECIAL", status: { in: ["APPROVED", "PENDING"] } },
+      select: { status: true, unitsMinutes: true },
+    }),
   ]);
 
   const cutoverDate = naverWorksLeaveCutoverDate();
@@ -163,10 +171,10 @@ async function buildSummary(employeeId: string) {
   const isPostCutoverRequest = (request: { createdAt: Date }) =>
     !sourceBalance || !cutoverDate || request.createdAt >= cutoverDate;
   const approvedMinutes = requests
-    .filter((request) => request.status === "APPROVED" && isPostCutoverRequest(request))
+    .filter((request) => request.leaveType !== "SPECIAL" && request.status === "APPROVED" && isPostCutoverRequest(request))
     .reduce((sum, request) => sum + request.unitsMinutes, 0);
   const pendingMinutes = requests
-    .filter((request) => request.status === "PENDING" && isPostCutoverRequest(request))
+    .filter((request) => request.leaveType !== "SPECIAL" && request.status === "PENDING" && isPostCutoverRequest(request))
     .reduce((sum, request) => sum + request.unitsMinutes, 0);
   const statutoryGrantedDays = statutoryAnnualLeaveDays(employee.hireDate, asOf);
   const sourceGrantedMinutes = sourceBalance
@@ -198,6 +206,13 @@ async function buildSummary(employeeId: string) {
       periodStart: period.start,
       periodEnd: period.end,
     },
+    specialSummary: {
+      grantedDays: minutesToDays(specialGrants.reduce((sum, grant) => sum + grant.unitsMinutes, 0), employee.workMinutesPerDay),
+      usedDays: minutesToDays(specialRequests.filter((request) => request.status === "APPROVED").reduce((sum, request) => sum + request.unitsMinutes, 0), employee.workMinutesPerDay),
+      pendingDays: minutesToDays(specialRequests.filter((request) => request.status === "PENDING").reduce((sum, request) => sum + request.unitsMinutes, 0), employee.workMinutesPerDay),
+      remainingDays: minutesToDays(specialGrants.reduce((sum, grant) => sum + grant.unitsMinutes, 0) - specialRequests.reduce((sum, request) => sum + request.unitsMinutes, 0), employee.workMinutesPerDay),
+    },
+    specialGrants,
     sourceBalance: sourceBalance && toSourceBalanceDays(
       sourceBalance,
       employee.workMinutesPerDay,
@@ -252,7 +267,7 @@ export async function POST(req: Request) {
   if (
     !leaveDate ||
     !leaveType ||
-    !["ANNUAL", "AM_HALF", "PM_HALF"].includes(leaveType)
+    !["ANNUAL", "AM_HALF", "PM_HALF", "SPECIAL"].includes(leaveType)
   ) {
     return NextResponse.json(
       { error: "휴가 종류와 날짜를 확인해 주세요." },
@@ -278,20 +293,20 @@ export async function POST(req: Request) {
   }
 
   const unitsMinutes =
-    leaveType === "ANNUAL"
+    leaveType === "ANNUAL" || leaveType === "SPECIAL"
       ? current.employee.workMinutesPerDay
       : Math.round(current.employee.workMinutesPerDay / 2);
   const remainingMinutes =
     Math.round(
       current.summary.remainingDays * current.employee.workMinutesPerDay,
     );
-  if (!canRequestAnnualLeave(
+  if (leaveType === "SPECIAL" ? current.specialSummary.remainingDays < 1 : !canRequestAnnualLeave(
     remainingMinutes,
     unitsMinutes,
     current.employee.workMinutesPerDay,
   )) {
     return NextResponse.json(
-      { error: "휴가 신청은 잔여 연차 -12일까지 가능합니다." },
+      { error: leaveType === "SPECIAL" ? "사용 가능한 유급 특별휴가가 없습니다." : "휴가 신청은 잔여 연차 -12일까지 가능합니다." },
       { status: 409 },
     );
   }
@@ -312,6 +327,16 @@ export async function POST(req: Request) {
   }
 
   const request = await prisma.$transaction(async (tx) => {
+    if (leaveType === "SPECIAL") {
+      await tx.$queryRaw`SELECT id FROM Employee WHERE id = ${employeeId} FOR UPDATE`;
+      const [grants, used] = await Promise.all([
+        tx.specialLeaveGrant.aggregate({ where: { employeeId }, _sum: { unitsMinutes: true } }),
+        tx.leaveRequest.aggregate({ where: { employeeId, leaveType: "SPECIAL", status: { in: ["PENDING", "APPROVED"] } }, _sum: { unitsMinutes: true } }),
+      ]);
+      if ((grants._sum.unitsMinutes ?? 0) - (used._sum.unitsMinutes ?? 0) < unitsMinutes) return null;
+      const existing = await tx.leaveRequest.findFirst({ where: { employeeId, leaveDate: { gte: leaveDate, lt: nextDay }, status: { in: ["PENDING", "APPROVED"] } }, select: { id: true } });
+      if (existing) return null;
+    }
     const created = await tx.leaveRequest.create({
       data: {
         employeeId,
@@ -336,6 +361,7 @@ export async function POST(req: Request) {
     });
     return created;
   });
+  if (!request) return NextResponse.json({ error: "특별휴가 잔여일 또는 날짜 중복을 확인해 주세요." }, { status: 409 });
 
   // The request remains valid even if chat delivery is temporarily unavailable.
   await notifyAdminsAboutApprovalRequest({
@@ -343,7 +369,7 @@ export async function POST(req: Request) {
     requestId: request.id,
     employeeName: current.employee.name,
     employeeCode: current.employee.code,
-    description: `${leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveType === "ANNUAL" ? "연차" : leaveType === "AM_HALF" ? "오전 반차" : "오후 반차"}`,
+    description: `${leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveType === "SPECIAL" ? "유급 특별휴가" : leaveType === "ANNUAL" ? "연차" : leaveType === "AM_HALF" ? "오전 반차" : "오후 반차"}`,
   });
 
   return NextResponse.json({ ok: true, request }, { status: 201 });

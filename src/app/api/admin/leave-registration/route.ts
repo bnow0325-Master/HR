@@ -36,8 +36,8 @@ export async function POST(request: Request) {
       const now = new Date();
       const source = await tx.naverWorksAnnualLeaveBalance.findFirst({ where: { employeeId, cycleStart: { lte: now }, cycleEnd: { gte: now } }, orderBy: [{ sourceAsOf: "desc" }, { importedAt: "desc" }] });
       const cutover = startOfKstDate(process.env.NAVER_WORKS_LEAVE_CUTOVER_DATE ?? "");
-      const requests = await tx.leaveRequest.findMany({ where: { employeeId, leaveDate: { gte: period.start, lt: period.end }, status: { in: ["PENDING", "APPROVED"] } }, select: { status: true, unitsMinutes: true, createdAt: true } });
-      const included = requests.filter((item) => !source || !cutover || item.createdAt >= cutover);
+      const requests = await tx.leaveRequest.findMany({ where: { employeeId, leaveDate: { gte: period.start, lt: period.end }, status: { in: ["PENDING", "APPROVED"] } }, select: { leaveType: true, status: true, unitsMinutes: true, createdAt: true } });
+      const included = requests.filter((item) => item.leaveType !== "SPECIAL" && (!source || !cutover || item.createdAt >= cutover));
       const approvedMinutes = included.filter((item) => item.status === "APPROVED").reduce((sum, item) => sum + item.unitsMinutes, 0);
       const pendingMinutes = included.filter((item) => item.status === "PENDING").reduce((sum, item) => sum + item.unitsMinutes, 0);
       const grantedMinutes = source ? source.annualGrantedMinutes + source.firstYearGrantedMinutes + source.firstYearCarryoverMinutes + source.carryoverMinutes + source.adjustedMinutes : statutoryAnnualLeaveDays(employee.hireDate, now) * employee.workMinutesPerDay;

@@ -29,6 +29,7 @@ function leaveTypeLabel(value: string) {
   if (value === "ANNUAL") return "연차";
   if (value === "AM_HALF") return "오전 반차";
   if (value === "PM_HALF") return "오후 반차";
+  if (value === "SPECIAL") return "유급 특별휴가";
   return value;
 }
 

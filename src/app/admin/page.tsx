@@ -134,6 +134,7 @@ function calendarDateInKst(date: Date) {
 function leaveTypeLabel(type: string) {
   if (type === "AM_HALF") return "오전 반차";
   if (type === "PM_HALF") return "오후 반차";
+  if (type === "SPECIAL") return "유급 특별휴가";
   return "연차";
 }
 
@@ -388,13 +389,13 @@ export default async function AdminPage({
       const approvedMinutes = requests
         .filter(
           (request) =>
-            request.status === "APPROVED" && isPostCutoverRequest(request),
+            request.leaveType !== "SPECIAL" && request.status === "APPROVED" && isPostCutoverRequest(request),
         )
         .reduce((sum, request) => sum + request.unitsMinutes, 0);
       const pendingMinutes = requests
         .filter(
           (request) =>
-            request.status === "PENDING" && isPostCutoverRequest(request),
+            request.leaveType !== "SPECIAL" && request.status === "PENDING" && isPostCutoverRequest(request),
         )
         .reduce((sum, request) => sum + request.unitsMinutes, 0);
       const grantedDays = statutoryAnnualLeaveDays(employee.hireDate, now);
@@ -553,6 +554,12 @@ export default async function AdminPage({
             className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 font-semibold text-blue-800 hover:bg-blue-100"
           >
             직원 휴가 직접 등록
+          </Link>
+          <Link
+            href="/admin/special-leave-grants"
+            className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 font-semibold text-emerald-800 hover:bg-emerald-100"
+          >
+            유급 특별휴가 부여
           </Link>
           <Link
             href="/admin/approvals"
