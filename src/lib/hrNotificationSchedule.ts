@@ -1,3 +1,4 @@
+import { CHRO_KEY_PREFIX, CHRO_SENDER_NAME } from "@/lib/hrChroTransport";
 import { prisma } from "@/lib/prisma";
 import { startOfKstDate } from "@/lib/annualLeave";
 import { CEO_EMAIL, kstDate } from "@/lib/hrNotifications";
@@ -31,8 +32,8 @@ export async function enqueueDueHrSummary(now = new Date()) {
   if (!monday && leaves.length === 0 && trips.length === 0) {
     // Record the 09:00 decision so later approvals do not produce a stale morning digest.
     await prisma.hrNotificationOutbox.createMany({ data: [{
-      idempotencyKey: `hr-summary-ceo-day-${date}`, recipientEmail: CEO_EMAIL,
-      audience: "operations", senderName: "[BNOW]", title: "오늘 휴가·출장",
+      idempotencyKey: `${CHRO_KEY_PREFIX}hr-summary-ceo-day-${date}`, recipientEmail: CEO_EMAIL,
+      audience: "operations", senderName: CHRO_SENDER_NAME, title: "오늘 휴가·출장",
       message: "해당 일정 없음", status: "SKIPPED",
     }], skipDuplicates: true });
     return { due: true, date, queued: false };
@@ -45,8 +46,8 @@ export async function enqueueDueHrSummary(now = new Date()) {
     `출장: ${tripText.length ? tripText.join(", ") : "없음"}`].join("\n");
   const result = await prisma.hrNotificationOutbox.createMany({
     data: [{
-      idempotencyKey: `hr-summary-ceo-${monday ? "week" : "day"}-${date}`,
-      recipientEmail: CEO_EMAIL, audience: "operations", senderName: "[BNOW]", title, message,
+      idempotencyKey: `${CHRO_KEY_PREFIX}hr-summary-ceo-${monday ? "week" : "day"}-${date}`,
+      recipientEmail: CEO_EMAIL, audience: "operations", senderName: CHRO_SENDER_NAME, status: "CHRO_PENDING", title, message,
     }], skipDuplicates: true,
   });
   return { due: true, date, queued: result.count === 1 };

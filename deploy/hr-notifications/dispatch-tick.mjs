@@ -20,6 +20,10 @@ if (!token) {
       failed: value.delivery?.failed,
       pending: value.delivery?.pending,
       configured: value.delivery?.configured === true,
+      chroConfigured: value.delivery?.chroConfigured === true,
+      missingCheckoutQueued: value.missingCheckout?.queued,
+      missingCheckoutReview: value.missingCheckout?.review,
+      missingCheckoutWorking: value.missingCheckout?.working,
     }));
     if (value.delivery?.configured !== true || value.delivery?.failed > 0) process.exitCode = 1;
   } catch {

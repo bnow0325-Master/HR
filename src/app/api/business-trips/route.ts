@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { startOfKstDate } from "@/lib/annualLeave";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
-import { notifyAdminsAboutApprovalRequest } from "@/lib/workboardApprovalNotifications";
+import { enqueueAbsenceStatusNotifications, dispatchPendingHrNotifications } from "@/lib/hrNotifications";
 
 type BusinessTripBody = {
   startDate?: string;
@@ -158,22 +158,14 @@ export async function POST(req: Request) {
         note: reason,
       },
     });
+    await enqueueAbsenceStatusNotifications(tx, {
+      kind: "business-trip", requestId: created.id, employeeName: authenticatedEmployee.name,
+      employeeEmail: authenticatedEmployee.email, description: `${body.startDate} ~ ${body.endDate}`, status: "PENDING",
+    });
     return created;
   });
 
-  const employeeDetails = await prisma.employee.findUnique({
-    where: { id: employeeId },
-    select: { name: true, code: true },
-  });
-  if (employeeDetails) {
-    await notifyAdminsAboutApprovalRequest({
-      kind: "business-trip",
-      requestId: trip.id,
-      employeeName: employeeDetails.name,
-      employeeCode: employeeDetails.code,
-      description: `${startDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ~ ${endDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} 출장`,
-    });
-  }
+  after(() => dispatchPendingHrNotifications(10).then(() => undefined).catch(() => undefined));
 
   return NextResponse.json({ ok: true, trip }, { status: 201 });
 }

@@ -20,7 +20,7 @@ async function fixture(fn) {
   } finally {
     const records=await db.attendanceRecord.findMany({where:{employeeId:id},select:{id:true}});
     for(const record of records) await db.hrNotificationOutbox.deleteMany({where:{idempotencyKey:{in:[
-      `hr-attendance-ceo-IN-${record.id}`,`hr-attendance-self-IN-${record.id}`,
+      `hr-chro-v1:hr-attendance-ceo-IN-${record.id}`,`hr-chro-v1:hr-attendance-self-IN-${record.id}`,
     ]}}});
     await db.attendanceRecord.deleteMany({where:{employeeId:id}});
     await db.employee.deleteMany({where:{id}});
@@ -35,9 +35,11 @@ test('actual MariaDB row locks serialize concurrent attendance requests and pers
     assert.deepEqual(responses.map(r=>r.status).sort(),[200,409,409]);
     const records=await db.attendanceRecord.findMany({where:{employeeId:id}});assert.equal(records.length,1);
     const rows=await db.hrNotificationOutbox.findMany({where:{idempotencyKey:{in:[
-      `hr-attendance-ceo-IN-${records[0].id}`,`hr-attendance-self-IN-${records[0].id}`,
+      `hr-chro-v1:hr-attendance-ceo-IN-${records[0].id}`,`hr-chro-v1:hr-attendance-self-IN-${records[0].id}`,
     ]}}});
     assert.equal(rows.length,2);assert.deepEqual(rows.map(r=>r.audience).sort(),['operations','work']);
+    assert.ok(rows.every(r=>r.status==='CHRO_PENDING'));
+    assert.equal(await db.hrNotificationOutbox.count({where:{id:{in:rows.map(r=>r.id)},status:{in:['PENDING','SENDING']}}}),0);
     assert.equal(rows.find(r=>r.audience==='operations').recipientEmail,'executive@example.test');
     assert.equal(rows.find(r=>r.audience==='work').recipientEmail,`${id}@example.test`);
     assert.equal(h.state.fetches.length,0);

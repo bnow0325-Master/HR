@@ -3,10 +3,11 @@ export function kstDate(date: Date): string {
 }
 
 export function kstTime(date: Date): string {
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul", month: "long", day: "numeric", hour: "2-digit",
-    minute: "2-digit", hour12: false,
-  }).format(date);
+  return new Date(date.getTime() + 9 * 3_600_000).toISOString().slice(0, 16).replaceAll("-", ".").replace("T", " ");
+}
+
+export function compactHrDates(description: string) {
+  return description.replace(/\b(\d{4})[-.]\s*(\d{1,2})[-.]\s*(\d{1,2})\.?/g, (_match, y: string, m: string, d: string) => `${y}.${m.padStart(2, "0")}.${d.padStart(2, "0")}`);
 }
 
 export function morningWindow(now: Date) {

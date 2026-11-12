@@ -18,7 +18,7 @@ test('tick uses the app-local protected endpoint and logs aggregate counters onl
     return Response.json({summary:{due:true,queued:true,message:'DO_NOT_PRINT'},delivery:{sent:2,failed:0,pending:0,configured:true,token:'DO_NOT_PRINT'}});
   }`);
   assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(JSON.parse(result.stdout), {summaryDue:true,queued:true,sent:2,failed:0,pending:0,configured:true});
+  assert.deepEqual(JSON.parse(result.stdout), {summaryDue:true,queued:true,sent:2,failed:0,pending:0,configured:true,chroConfigured:false});
   assert.doesNotMatch(result.stdout + result.stderr, /DO_NOT_PRINT|test-only-scheduler-token|Bearer/);
 });
 

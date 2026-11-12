@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { enqueueDueHrSummary } from "@/lib/hrNotificationSchedule";
 import { dispatchPendingHrNotifications } from "@/lib/hrNotifications";
+import { enqueueDueMissingCheckouts } from "@/lib/hrMissingCheckoutSchedule";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
   const summary = await enqueueDueHrSummary();
+  const missingCheckout = await enqueueDueMissingCheckouts();
   const delivery = await dispatchPendingHrNotifications(10);
-  return Response.json({ summary, delivery }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ summary, missingCheckout, delivery }, { headers: { "Cache-Control": "no-store" } });
 }

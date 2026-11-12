@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, createHmac } from 'node:crypto';
 import ts from 'typescript';
 
 // Execute the actual route/module source with fake authentication and a rollback-capable
@@ -57,9 +57,11 @@ export async function harness(options = {}) {
     findUnique: async ({where}) => state.outbox.find(row=>row.idempotencyKey===where.idempotencyKey) ?? null,
   };
   const db = {
-    employee: { findUnique: async () => ({ locationConsentAt: null, locationConsentVersion: null }) },
+    employee: { findUnique: async () => ({ ...employee, locationConsentAt: null, locationConsentVersion: null }), findMany: async () => [] },
     hrNotificationOutbox: outbox,
     attendanceRecord: {
+      findUnique: async ({where}) => { const row=state.records.find(r=>r.id===where.id); return row?{...row,employee}:null; },
+      findMany: async ({where}) => matchingRecord(where),
       findFirst: async ({where}) => matchingRecord(where).sort((a,b)=>+b.timestamp-+a.timestamp)[0] ?? null,
       create: async ({data}) => {
         if(state.failSave) throw Error('simulated record save failure');
@@ -71,6 +73,8 @@ export async function harness(options = {}) {
       },
     },
     leaveRequest: {
+      findUnique: async ({where}) => {const row=(state.leaves??[]).find(r=>r.id===where.id); return row?{...row,employee:{active:true,...row.employee}}:null;},
+      count: async()=>0,
       findMany: async args=>{state.summaries.push({kind:'leave',...args});return state.leaves??[];},
       findFirst: async ({where})=>(state.leaves??[]).find(row=>row.id===where.id && row.status===where.status)??null,
       updateMany: async ({where,data})=>{
@@ -79,6 +83,8 @@ export async function harness(options = {}) {
       },
     },
     businessTrip: {
+      findUnique: async ({where}) => {const row=(state.trips??[]).find(r=>r.id===where.id); return row?{...row,employee:{active:true,...row.employee}}:null;},
+      count: async()=>0,
       findMany: async args=>{state.summaries.push({kind:'trip',...args});return state.trips??[];},
       findFirst: async ({where})=>(state.trips??[]).find(row=>
         (!where.id || row.id===where.id) && row.status===where.status &&
@@ -99,17 +105,17 @@ export async function harness(options = {}) {
     const snapshot=structuredClone({records:state.records,outbox:state.outbox,leaves:state.leaves,trips:state.trips,audits:state.audits});
     try{return await callback(db);}catch(error){Object.assign(state,snapshot);throw error;}finally{unlock();}
   };
-  const env={APPROVAL_CEO_EMAIL:'executive@example.test',WORKBOARD_STAFF_CHAT_WEBHOOK_URL:'https://chat.example.test/incoming',
+  const env={APPROVAL_CEO_EMAIL:'executive@example.test',WORKBOARD_STAFF_CHAT_WEBHOOK_URL:'https://chat.bnow.co.kr/api/staff-chat/webhooks/incoming',HR_CHRO_NOTIFICATIONS_START_AT:new Date(now-1000).toISOString(),
     WORKBOARD_STAFF_CHAT_WEBHOOK_TOKEN:'test-only-token',HR_NOTIFICATION_CRON_TOKEN:'test-only-cron'};
   const context=vm.createContext({Date:ClockDate,Request,Response,URL,Buffer,Intl,AbortController,setTimeout,clearTimeout,
     console, process:{env}, fetch:async(url,request)=>{
-      state.fetches.push({url,...JSON.parse(request.body)});
+      state.fetches.push({url,authorization:request.headers.Authorization,...JSON.parse(request.body)});
       return state.respond ? state.respond() : Response.json({chatOk:true,roomId:'representative-direct-test',messageSeq:42});
     }});
   const modules=new Map();
   function synthetic(id,exports){const mod=new vm.SyntheticModule(Object.keys(exports),function(){for(const[k,v]of Object.entries(exports))this.setExport(k,v)},{context,identifier:id});modules.set(id,mod);return mod;}
   synthetic('next/server',{NextResponse:Response,after:callback=>state.after.push(callback)});
-  synthetic('node:crypto',{timingSafeEqual});
+  synthetic('node:crypto',{timingSafeEqual,createHmac});
   synthetic('@/lib/prisma',{prisma:options.database??db});
   synthetic('@/lib/adminAuth',{isAdmin:async()=>employee?.systemRole==='ADMIN'});
   synthetic('@/lib/locationConsent',{hasCurrentLocationConsent:()=>false});
@@ -122,14 +128,22 @@ export async function harness(options = {}) {
   async function load(id){
     if(modules.has(id))return modules.get(id);
     const filename=id.startsWith('@/')?path.join(root,id.slice(2))+'.ts':id;
+    if(modules.has(filename))return modules.get(filename);
     const source=await readFile(filename,'utf8');
+    if(modules.has(filename))return modules.get(filename);
     const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-    const mod=new vm.SourceTextModule(code,{context,identifier:filename});modules.set(id,mod);
-    await mod.link(async spec=>{
-      if(spec.startsWith('.'))return load(path.resolve(path.dirname(filename),spec+'.ts'));
-      return load(spec);
-    });return mod;
+    const mod=new vm.SourceTextModule(code,{context,identifier:filename});modules.set(filename,mod);modules.set(id,mod);
+    return mod;
   }
-  async function api(id){const mod=await load(id);if(mod.status!=='evaluated')await mod.evaluate();return mod.namespace;}
+  const apiPromises=new Map();
+  function api(id){
+    if(!apiPromises.has(id))apiPromises.set(id,(async()=>{
+      const mod=await load(id);
+      if(mod.status==='unlinked')await mod.link(async(spec,referencing)=>load(spec.startsWith('.')?path.resolve(path.dirname(referencing.identifier),spec+'.ts'):spec));
+      if(mod.status!=='evaluated')await mod.evaluate();
+      return mod.namespace;
+    })());
+    return apiPromises.get(id);
+  }
   return {state,db,env,api,now,post:async body=>(await api('@/app/api/attendance/route')).POST(new Request('http://hr.example.test/api/attendance',{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'application/json'}}))};
 }

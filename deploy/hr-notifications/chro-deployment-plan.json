@@ -1,0 +1,118 @@
+{
+  "record": "BNOW-INT-2026-0049_R00 technical execution appendix",
+  "formalRecordOwner": "CHRO",
+  "state": "DRAFT_BLOCKED_PENDING_OPERATOR_EVIDENCE_AND_PRODUCTION_GATES",
+  "sources": {
+    "BnowChat": {
+      "pr": 167,
+      "featureCommit": "df37dba99da54d5235a2610eb3c409981d490396"
+    },
+    "HR": {
+      "pr": 133,
+      "featureCommit": "9ead0d8377e6585f719fc587c2be80b7dccbdc4a"
+    }
+  },
+  "currentProductionMeasured": false,
+  "productionChanges": 0,
+  "realEmployeeMessages": 0,
+  "readOnlyDenial": {
+    "at": "2026-11-12T15:39:55Z",
+    "server": "1-ubuntu",
+    "account": "elonchoo",
+    "sessionId": "9290e740-b4e5-43b8-a3cf-b997de00140e",
+    "sessionClosed": true,
+    "commandId": "0416255b-7d89-4775-8aa2-3e878e610bd0",
+    "result": "Docker socket permission denied",
+    "retriesOrElevation": 0
+  },
+  "operatorProbe": {
+    "file": "deploy/hr-notifications/chro-readonly-preflight.mjs",
+    "sha256": "0b0a2326650f078107b0feb968c3327c6bc010c7e219500aa0bb52e1abb649a7",
+    "execution": "정식 승인된 운영자가 승인된 Alpacon agent WorkSession과 해당 파일 해시를 명시해 실행. 현재 거부를 다른 계정/승격/agent로 우회 실행하지 않는다.",
+    "commandTemplate": "node /tmp/bnow-chro-readonly-0b0a2326650f.mjs <approved-work-session-uuid>",
+    "localOnlyValidation": "node --check 및 합성 집계 단위검사 통과; 실제 운영 실행 미검증",
+    "outputs": "릴리스 경로/이미지/이미지태그, 활성 HR/수신준비/미연동 인원수, outbox 상태별 건수, 기존 비밀 일치와 공식 목적지 여부, 활성화 설정 여부만 출력. 이메일·메시지·비밀·비밀해시는 최종 출력하지 않음",
+    "canonicalBytes": "UTF-8 without BOM, LF. Git blob / delivered file exact bytes; do not convert line endings.",
+    "deliveryAndExecution": {
+      "localDeliveryFile": "C:\\Users\\Elon Choo PC\\Desktop\\생성문서\\AI임원_CHRO_알림_구현증빙_20261113\\chro-readonly-preflight.mjs",
+      "remoteStagingPath": "/tmp/bnow-chro-readonly-0b0a2326650f.mjs",
+      "formalAccount": "대표가 정식 운영자로 지정한 기존 승인 계정. 실제 이름은 WorkSession target_account_username에 먼저 고정한다. 새 계정/권한/sudo 정책을 만들지 않는다.",
+      "formalWorkSession": "새로운 명시 승인 agent WorkSession의 scopes command+webftp, server 1-ubuntu, 실제 운영자 계정. 현재 닫힌 거부 세션9290e740을 재사용하거나 다른 자격으로 우회하지 않는다.",
+      "interpreter": "운영자가 command -v node로 확인한 실제 절대 Node 경로. /usr/bin/node는 존재가 확인된 경우만 사용하며 없으면 설치/변형 실행하지 않고 출력 제공 방식으로 전환.",
+      "verifiedFileToolExample": {
+        "tool": "Alpacon execute_file",
+        "workspace": "livecare",
+        "region": "ap1",
+        "server_id": "a5eeaf1f-cf79-47ef-9066-3492b52ed72b",
+        "work_session_id": "<formal-approved-session-uuid>",
+        "username": "<formally-named-existing-operator>",
+        "path": "/tmp/bnow-chro-readonly-0b0a2326650f.mjs",
+        "interpreter": "<verified-absolute-node-path>",
+        "args": [
+          "<same-formal-approved-session-uuid>"
+        ],
+        "content": "<exact UTF-8 LF file bytes whose SHA-256 is 0b0a2326650f078107b0feb968c3327c6bc010c7e219500aa0bb52e1abb649a7>",
+        "write_file": true,
+        "overwrite": false,
+        "purpose": "현재 HR/비노우톡 릴리스 및 직원 수신준비·outbox 집계를 읽기 확인; 쓰기/전송/설정변경 없음"
+      },
+      "submissionOrder": [
+        "대표가 운영자/범위 명시 지시 또는 운영자가 이미 승인된 절차의 결과만 제공",
+        "정식 WorkSession active/계정/서버 대조",
+        "로컬 파일 SHA-256 대조",
+        "execute_file write_file=true로 정확한 파일 임시배치+검토(기존파일 덮어쓰기 금지)",
+        "verified-file 결과의 해시/실행계정/세션/종료코드/집계 출력 보존",
+        "권한거부나 해시불일치면 즉시 중단, 재자격/변형명령 우회 금지",
+        "운영자가 본인 세션만 종료; 업로드된 비밀 없는 도구 사본은 해당 절차에 따라 보존/정리"
+      ],
+      "expectedResult": "exit0의 집계 JSON에 at, workSessionId, operatorAccount, host, releases 및 readiness/outbox count. 실패 exit1은 비밀 없는 unavailable 문구이며 자료 미확인으로 남긴다."
+    }
+  },
+  "preflightPassCriteria": [
+    "두 운영 컨테이너의 실제 이미지/태그/Compose 작업경로와 최신 배포기록 일치. 현재 값은 미확인이다.",
+    "canonicalDestination=true, existingServerSecretsMatch=true. 불일치 시 비밀을 임의로 바꾸지 않고 운영자 확인.",
+    "eligibleMissingChatAccount=0, withoutEmail/workboardDisabled를 각각 보고하고 allActiveEmployeesReady가 false면 누락 범위를 CHRO가 확정한다. 활성 HR 수를 전사 전체 인원으로 확대하지 않음.",
+    "기존 outbox 상태별 건수와 SENT 영수증 보존을 확인. 38은 과거 관측이며 현재 건수로 고정하지 않음.",
+    "새 기능 전환 전 employee delivery flag/cutover는 비활성. 실제 활성화 UTC 시각은 승인 후에 확정하며 소급 설정하지 않음."
+  ],
+  "backupAndRestoreGates": [
+    "승인된 새 백업경로에 HR 및 비노우톡의 기존 전체 소스/환경(비밀값 비공개), 정적/API 이미지 digest/태그, Compose 경로, 정적 current 연결과 첨부파일 볼륨을 보존하고 SHA-256 대조.",
+    "HR 전용 MariaDB 전체 스키마/데이터/루틴/이벤트/트리거를 transaction-consistent dump로 보존. 대표 예시: 승인된 HR DB 컨테이너에서 mariadb-dump --single-transaction --quick --routines --events --triggers --hex-blob <actual-HR-schema>. 인증은 기존 컨테이너 방식만 사용하고 비밀을 인자/출력에 두지 않음.",
+    "비노우톡 사용 MariaDB의 실제 관련 스키마 전체와 첨부파일을 별도 보존. 같은/별도 자료실 DB에 WB_RESOURCE_FOLDER, WB_RESOURCE_FILE LONGBLOB/메타데이터 및 WB_RESOURCE_LIBRARY_SCHEMA_MIGRATION이 있으면 해당 DB 전체도 포함. 업무 PostgreSQL을 이 범위의 대체 백업으로 삼지 않음.",
+    "백업을 운영과 네트워크/자격/볼륨이 분리된 임시 DB/디렉터리에 복원하여 테이블별 행수, LONGBLOB 건수/바이트/해시 및 첨부파일 해시를 대조. 신규 코드의 실제 MariaDB CI는 이 최근 운영 전체복원 증거가 아님.",
+    "원본 운영 DB에 restore하지 않는다. 생성한 격리 검증 자원만 운영자가 식별·검증 후 정리한다. 보호 백업경로의 과거 거부를 에이전트가 재시도하지 않음."
+  ],
+  "deploymentOrder": [
+    "운영자 증빙과 복원검사, 사용자 별도 운영 승인 및 BnowChat 필수 회귀/실기기 게이트 또는 누락 위험을 특정한 명시 예외 승인을 확보. CHRO/디자인의 로컬 시안 통과만으로 병합/배포하지 않음.",
+    "다른 변경/원본 dirty 트리를 보존하고 최신 origin/main을 재대조. PR167/133의 최신 CI를 확인한 뒤 승인 범위의 두 PR만 병합. PR165/166/HR120 전체를 함께 병합하지 않음.",
+    "병합된 최신 main 전체를 각각 git archive로 묶고 실제 main commit, archive SHA-256, 태그, 새 릴리스 경로를 고정한다. 부분 파일 배포 금지.",
+    "BnowChat runner 이미지를 먼저 빌드하고 app-only로 배포. 신규 스키마가 없으므로 WorkBoard PostgreSQL/자료실/직원 MariaDB 마이그레이션을 부수적으로 실행하지 않음. 기존 deploy/server-deploy.sh는 PG migration과 nginx 설정 변경을 포함하므로 그대로 실행하지 않음.",
+    "읽기전용 방 가드/10역할/기존 대표 API와 비참여자 차단을 확인한 뒤 AI_EXECUTIVE_EMPLOYEE_MESSAGES_ENABLED=true로 전환하는 승인된 전체 API 릴리스 실행. 원래 비밀·권한은 유지.",
+    "HR 최신 main 전체 runner를 새 경로에 준비. 기존 환경과 cron token/timer를 보존하고 재생성/중복 설치하지 않음. HR_CHRO_NOTIFICATIONS_START_AT는 수신부 검증 이후의 실제 UTC 시각으로 명시. 초기설치용 deploy/hr-notifications/deploy.sh는 이미 설치된 timer와 old outbox migration을 가정하므로 그대로 재실행하지 않음.",
+    "HR app-only 전환(--no-deps, 마이그레이션 없음), HTTPS/health/실제 이미지 확인. 신규 CHRO_PENDING/CHRO_SENDING만 새 전용 API가 소비하고 기존 SENT를 재발송하지 않는지 대조.",
+    "대표가 선택한 무해한 연결 확인 1건을 실제 대표 방에서 확인하고 같은 키 재실행은 같은 영수증/푸시 중복 없음 확인. 실제 직원 원장은 테스트로 생성하지 않는다.",
+    "다음 정상 직원 출근/퇴근·휴가/출장 등록과 승인/반려, 퇴근 보완을 CHRO가 당사자 정상 흐름으로 수용. 직원별 방/검색/푸시에서 다른 직원 정보가 보이지 않음을 확인. Android/iPhone 푸시/배지/딥링크는 채팅 저장과 구분한다.",
+    "실제 main/운영/이미지/컷오프/백업/검증을 기록해 CHRO가 R00을 보존한 R01을 발행. 현재는 실행 미완료."
+  ],
+  "immediateRecovery": {
+    "beforeActivation": "새 수신자 알림이 없고 기존 실행 이미지/정적/API가 유지된다. 빌드/검증 실패 시 전환하지 않는다.",
+    "afterActivation": [
+      "BnowChat의 AI_EXECUTIVE_EMPLOYEE_MESSAGES_ENABLED=false를 적용해 동일 최신 전체 릴리스를 재기동하면 새 직원 전송은503으로 보류되고 기존 읽기전용/개인방 보호는 유지된다.",
+      "승인 범위에서 기존 HR 알림 timer를 잠시 멈춘 뒤, 정확한 직전 HR 이미지/태그/Compose 경로로 app만 --no-build --no-deps 복원. 아래 템플릿의 실제 값과 새 실행 이미지 일치를 먼저 확인한다.",
+      "신규 CHRO_PENDING/CHRO_SENDING는 구버전 HR worker 조회에서 제외되므로 잘못된 공용 봇 전송을 막는다. HR 원장/outbox/메시지는 과거 DB로 덮어쓰거나 삭제하지 않는다.",
+      "신규 직원 임원방이 생성된 뒤에는 7역할 구버전 BnowChat API로 복원하지 않는다. 수신부 보호를 유지한 최신 main 수정 릴리스로 복구한다. 구버전과 혼합한 정적/API 부분 배포도 금지."
+    ],
+    "hrCodeRestoreTemplates": [
+      "test \"$(docker inspect --format '{{.Image}}' bnow-checkinout-app-1)\" = \"$APPROVED_NEW_HR_IMAGE\"",
+      "docker image tag \"$PREVIOUS_HR_IMAGE_DIGEST\" \"$PREVIOUS_HR_IMAGE_REF\"",
+      "docker compose --project-name bnow-checkinout --project-directory \"$PREVIOUS_HR_COMPOSE_DIR\" --env-file \"$PREVIOUS_HR_COMPOSE_DIR/.env.production.local\" -f \"$PREVIOUS_HR_COMPOSE_DIR/compose.production.yml\" up -d --no-build --no-deps app"
+    ],
+    "currentlyUnresolved": [
+      "실측 직전 이미지/태그/작업경로",
+      "새 백업경로/격리복원 결과",
+      "실제 수신자 연결 범위",
+      "실제 단말/직원 수용",
+      "명시 승인된 컷오프와 운영 실행 범위"
+    ]
+  }
+}
