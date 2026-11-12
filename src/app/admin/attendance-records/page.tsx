@@ -47,6 +47,7 @@ export default async function AdminAttendanceRecordsPage({
   const working = report?.rows.filter((row) => row.status === "근무 중").length ?? 0;
   const exceptions = report?.rows.filter((row) => ["퇴근 미등록", "출근 누락", "이관 공백", "미출근"].includes(row.status)).length ?? 0;
   const minutes = report?.rows.reduce((sum, row) => sum + row.minutes, 0) ?? 0;
+  const today = kstDate(new Date());
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -54,14 +55,20 @@ export default async function AdminAttendanceRecordsPage({
         <div>
           <p className="text-xs font-bold tracking-[0.18em] text-blue-600">BNOW PEOPLE ADMIN</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-950">직원별 출퇴근</h1>
-          <p className="mt-2 text-sm text-slate-600">직원과 기간을 선택해 날짜별 출퇴근 시각, 근무 세션과 누락 기록을 확인합니다.</p>
+          <p className="mt-2 text-sm text-slate-600">직원별 출근·퇴근 시각과 근태 상태를 한 줄씩 확인합니다.</p>
         </div>
         <Link href="/admin" className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">관리자 홈</Link>
       </header>
 
-      <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex flex-wrap items-end gap-4">
-          <form className="flex flex-wrap items-end gap-3">
+      <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={`/admin/attendance-records?start=${today}&end=${today}`} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white">오늘</Link>
+          <Link href={`/admin/attendance-records?month=${today.slice(0, 7)}`} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">이번 달</Link>
+        </div>
+        <details className="mt-3 border-t border-slate-100 pt-3">
+          <summary className="cursor-pointer text-sm font-semibold text-blue-700">기간·직원 필터</summary>
+          <div className="mt-4 flex flex-wrap items-end gap-4">
+            <form className="flex flex-wrap items-end gap-3">
             <label className="text-sm font-medium text-slate-700">조회 월
               <input name="month" type="month" defaultValue={month} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" />
             </label>
@@ -72,8 +79,8 @@ export default async function AdminAttendanceRecordsPage({
               </select>
             </label>
             <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">월 조회</button>
-          </form>
-          <form className="flex flex-wrap items-end gap-3">
+            </form>
+            <form className="flex flex-wrap items-end gap-3">
             <label className="text-sm font-medium text-slate-700">시작일
               <input name="start" type="date" defaultValue={report?.range.startDay ?? ""} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" />
             </label>
@@ -87,14 +94,15 @@ export default async function AdminAttendanceRecordsPage({
               </select>
             </label>
             <button className="rounded-lg border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-700">기간 조회</button>
-          </form>
-        </div>
-        <nav className="mt-4 flex flex-wrap items-center gap-2" aria-label="월 이동">
-          <Link href={`/admin/attendance-records?month=${adjacentMonth(month, -1)}&employeeId=${encodeURIComponent(employeeId)}`} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">이전 달</Link>
-          <strong className="px-2 text-sm text-slate-800">{month}</strong>
-          <Link href={`/admin/attendance-records?month=${adjacentMonth(month, 1)}&employeeId=${encodeURIComponent(employeeId)}`} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">다음 달</Link>
-        </nav>
-        <p className="mt-3 text-xs text-slate-500">한국시간 기준 · 최대 93일 · HR 기록 우선, 없는 날짜에 네이버웍스 이관 원장 표시 · 시각 간격은 휴게시간을 공제하지 않습니다. 미출근은 기록 부재이며 무단결근 판정이 아닙니다. 공휴일과 근무제별 지각·조퇴 자동 판정은 제공하지 않습니다.</p>
+            </form>
+          </div>
+          <nav className="mt-4 flex flex-wrap items-center gap-2" aria-label="월 이동">
+            <Link href={`/admin/attendance-records?month=${adjacentMonth(month, -1)}&employeeId=${encodeURIComponent(employeeId)}`} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">이전 달</Link>
+            <strong className="px-2 text-sm text-slate-800">{month}</strong>
+            <Link href={`/admin/attendance-records?month=${adjacentMonth(month, 1)}&employeeId=${encodeURIComponent(employeeId)}`} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">다음 달</Link>
+          </nav>
+          <p className="mt-3 text-xs text-slate-500">한국시간 기준 · 최대 93일 · HR 기록 우선, 없는 날짜에 네이버웍스 이관 원장 표시 · 시각 간격은 휴게시간을 공제하지 않습니다. 미출근은 기록 부재이며 무단결근 판정이 아닙니다. 공휴일과 근무제별 지각·조퇴 자동 판정은 제공하지 않습니다.</p>
+        </details>
       </section>
 
       {error ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p> : null}
@@ -103,48 +111,38 @@ export default async function AdminAttendanceRecordsPage({
           <div className="text-sm text-slate-600">{report.range.startDay} ~ {report.range.endDay} · {report.rows.length}개 직원·일</div>
           <a href={`/api/admin/attendance-records/export?${exportParams.toString()}`} className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">현재 조건 CSV</a>
         </div>
-        <section className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <section className="mb-4 flex flex-wrap gap-2">
           <Metric label="완료" value={`${completed}일`} />
           <Metric label="근무 중" value={`${working}일`} />
           <Metric label="확인 필요" value={`${exceptions}일`} />
           <Metric label="출퇴근 시각 간격 합계" value={formatWorkMinutes(minutes)} />
           <Metric label="취소 기록" value={`${report.rows.reduce((sum, row) => sum + row.cancelledCount, 0)}건`} />
         </section>
-        <section className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
-          <table className="min-w-[1120px] w-full text-left text-sm">
+        <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white" aria-label="직원별 일일 출퇴근 기록">
+          <table className="w-full min-w-[560px] border-collapse text-left text-xs sm:text-sm">
+            <caption className="sr-only">직원별 날짜, 출근·퇴근 시각, 근무시간, 근태 상태</caption>
             <thead className="bg-slate-50 text-slate-600"><tr>
-              <th className="px-4 py-3">날짜</th><th className="px-4 py-3">직원</th><th className="px-4 py-3">첫 출근</th><th className="px-4 py-3">마지막 퇴근</th><th className="px-4 py-3">근무 세션</th><th className="px-4 py-3">시각 간격</th><th className="px-4 py-3">상태</th><th className="px-4 py-3">원천·확인 사항</th><th className="px-4 py-3">취소</th>
+              <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">직원</th>
+              <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">날짜</th>
+              <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">상태</th>
+              <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">출근</th>
+              <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">퇴근</th>
+              <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">간격</th>
+              <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">상세</th>
             </tr></thead>
-            <tbody>{report.rows.map((row) => <tr key={`${row.employeeId}:${row.date}`} className="border-t border-slate-100 align-top">
-              <td className="whitespace-nowrap px-4 py-3">{row.date}</td>
-              <td className="whitespace-nowrap px-4 py-3"><strong>{row.name}</strong><br /><span className="text-xs text-slate-500">{row.code} · {row.department ?? "부서 미지정"}</span></td>
-              <td className="px-4 py-3">{row.firstIn ?? "—"}</td><td className="px-4 py-3">{row.lastOut ?? "—"}</td>
-              <td className="px-4 py-3">{row.sessions.length ? row.sessions.join(" / ") : "—"}</td>
-              <td className="whitespace-nowrap px-4 py-3">{row.minutes ? formatWorkMinutes(row.minutes) : "—"}</td>
-              <td className="whitespace-nowrap px-4 py-3"><span className={row.status === "완료" || row.status === "근무 중" ? "text-emerald-700" : row.status === "퇴근 미등록" || row.status === "출근 누락" ? "font-semibold text-rose-700" : "text-slate-500"}>{statusLabel(row)}</span></td>
-              <td className="px-4 py-3"><strong>{row.source}</strong>{recordNotes(row) ? <div className="mt-1 text-xs text-slate-600">{recordNotes(row)}</div> : null}</td>
-              <td className="px-4 py-3">{row.cancelledCount || "—"}</td>
+            <tbody>{report.rows.map((row) => <tr key={`${row.employeeId}:${row.date}`} className="border-t border-slate-100 align-middle even:bg-slate-50/50">
+              <th scope="row" className="whitespace-nowrap px-2 py-2.5 font-semibold text-slate-900 sm:px-3" title={`${row.code} · ${row.department ?? "부서 미지정"}`}>{row.name}</th>
+              <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-slate-600 sm:px-3" title={row.date}>{row.date.slice(5).replace("-", ".")}</td>
+              <td className="whitespace-nowrap px-2 py-2.5 sm:px-3"><span className={statusTone(row)}>{statusLabel(row)}</span></td>
+              <td className="whitespace-nowrap px-2 py-2.5 tabular-nums sm:px-3">{row.firstIn ?? "—"}</td>
+              <td className="whitespace-nowrap px-2 py-2.5 tabular-nums sm:px-3">{row.lastOut ?? "—"}</td>
+              <td className="whitespace-nowrap px-2 py-2.5 tabular-nums sm:px-3">{row.minutes ? formatWorkMinutes(row.minutes) : "—"}</td>
+              <td className="px-2 py-2.5 sm:px-3"><details className="text-slate-600"><summary className="cursor-pointer whitespace-nowrap font-medium text-blue-700">보기</summary><div className="min-w-40 py-2 text-xs leading-5"><p>사번 {row.code} · {row.department ?? "부서 미지정"}</p><p>원천: {row.source}</p>{row.sessions.length ? <p>세션: {row.sessions.join(" / ")}</p> : null}{row.notes.includes("출장 승인") && row.sessions.length ? <p>근태: {row.status}</p> : null}{recordNotes(row) ? <p>확인: {recordNotes(row)}</p> : null}{row.cancelledCount ? <p>취소 기록: {row.cancelledCount}건</p> : null}</div></details></td>
             </tr>)}</tbody>
           </table>
           {report.rows.length === 0 ? <p className="p-6 text-sm text-slate-500">이 조건에 해당하는 기록이 없습니다.</p> : null}
         </section>
-        <section className="grid gap-3 md:hidden" aria-label="직원별 일일 출퇴근 기록">
-          {report.rows.map((row) => <article key={`${row.employeeId}:${row.date}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div><p className="text-sm font-bold text-slate-950">{row.name} <span className="font-normal text-slate-500">({row.code})</span></p><p className="mt-1 text-xs text-slate-500">{row.date} · {row.department ?? "부서 미지정"}</p></div>
-              <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">{statusLabel(row)}</span>
-            </div>
-            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-xl bg-blue-50 p-2.5"><dt className="text-xs text-blue-700">출근</dt><dd className="mt-1 font-bold text-slate-900">{row.firstIn ?? "미등록"}</dd></div>
-              <div className="rounded-xl bg-emerald-50 p-2.5"><dt className="text-xs text-emerald-700">퇴근</dt><dd className="mt-1 font-bold text-slate-900">{row.lastOut ?? "미등록"}</dd></div>
-            </dl>
-            <p className="mt-3 text-xs text-slate-600">원천: {row.source}{row.minutes ? ` · 출퇴근 시각 간격 ${formatWorkMinutes(row.minutes)}` : ""}</p>
-            {row.sessions.length ? <p className="mt-1 text-xs text-slate-600">세션: {row.sessions.join(" / ")}</p> : null}
-            {recordNotes(row) ? <p className="mt-1 text-xs font-medium text-amber-800">확인: {recordNotes(row)}</p> : null}
-            {row.cancelledCount ? <p className="mt-1 text-xs text-slate-500">취소 기록 {row.cancelledCount}건</p> : null}
-          </article>)}
-          {report.rows.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">이 조건에 해당하는 기록이 없습니다.</p> : null}
-        </section>
+        <p className="mt-2 text-xs text-slate-500">간격은 출근~퇴근 시각 차이이며 휴게시간은 공제하지 않습니다.</p>
       </> : null}
     </main>
   );
@@ -155,11 +153,21 @@ function recordNotes(row: ReportAttendanceDay) {
 }
 
 function statusLabel(row: ReportAttendanceDay) {
-  if (row.status === "미출근") return "기록 없음 · 확인 필요";
-  if (row.status === "이관 공백") return "이관 기록 공백";
+  if (row.status === "승인 출장" || row.notes.includes("출장 승인")) return "출장";
+  if (row.status === "승인 휴가") return "휴가";
+  if (row.status === "미출근") return "확인 필요";
+  if (row.status === "이관 공백") return "이관 공백";
   return row.status;
 }
 
+function statusTone(row: ReportAttendanceDay) {
+  if (row.status === "완료" || row.status === "근무 중") return "font-semibold text-emerald-700";
+  if (row.status === "승인 출장" || row.notes.includes("출장 승인")) return "font-semibold text-blue-700";
+  if (row.status === "승인 휴가") return "font-semibold text-violet-700";
+  if (["퇴근 미등록", "출근 누락", "미출근", "이관 공백"].includes(row.status)) return "font-semibold text-rose-700";
+  return "text-slate-600";
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold text-slate-900">{value}</p></div>;
+  return <div className="flex items-baseline gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2"><span className="text-xs text-slate-500">{label}</span><strong className="text-sm text-slate-900">{value}</strong></div>;
 }
