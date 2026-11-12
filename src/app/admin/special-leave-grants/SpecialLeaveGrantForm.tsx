@@ -19,7 +19,10 @@ export default function SpecialLeaveGrantForm({ employees, today }: { employees:
       const response = await fetch("/api/admin/special-leave-grants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeId, sourceWorkDate, reason }) });
       const data = await response.json() as Result;
       setResult(response.ok ? data : { error: data.error || "부여하지 못했습니다." });
-      if (response.ok) router.refresh();
+      if (response.ok) {
+        setEmployeeId(""); setSourceWorkDate(""); setReason("");
+        router.refresh();
+      }
     } catch { setResult({ error: "네트워크 오류로 부여하지 못했습니다." }); }
     finally { setBusy(false); }
   }
