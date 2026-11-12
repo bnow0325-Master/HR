@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { enqueueAbsenceStatusNotifications, dispatchPendingHrNotifications } from "@/lib/hrNotifications";
+import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentLeavePeriod, startOfKstDate, statutoryAnnualLeaveDays } from "@/lib/annualLeave";
 import { adminLeaveBalance } from "@/lib/adminLeaveBalance";
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
       // Serialize registrations and approvals for the same employee.
       await tx.$queryRaw`SELECT id FROM Employee WHERE id = ${employeeId} FOR UPDATE`;
       const employee = await tx.employee.findUnique({ where: { id: employeeId }, select: {
-        id: true, code: true, name: true, active: true, leaveEnabled: true, hireDate: true, workMinutesPerDay: true,
+        id: true, code: true, name: true, email: true, active: true, leaveEnabled: true, hireDate: true, workMinutesPerDay: true,
       } });
       if (!employee || !employee.active || !employee.leaveEnabled || !employee.hireDate) throw new Error("EMPLOYEE");
       const period = currentLeavePeriod(employee.hireDate);
@@ -46,8 +47,11 @@ export async function POST(request: Request) {
       if (!balance.canRegister) throw new Error("LIMIT");
       const created = await tx.leaveRequest.create({ data: { employeeId, leaveDate, leaveType, unitsMinutes, status: "APPROVED", reviewedAt: now, reviewedByEmail: admin.email, reviewerNote: "대표이사 직접 등록", reason: null }, select: { id: true } });
       await tx.approvalAudit.create({ data: { employeeId, requestKind: "leave", requestId: created.id, action: "ADMIN_REGISTER", toStatus: "APPROVED", actorEmail: admin.email, actorName: admin.name, note: "대표이사 요청에 따른 직접 등록" } });
+      await enqueueAbsenceStatusNotifications(tx, { kind: "leave", requestId: created.id,
+        employeeName: employee.name, employeeEmail: employee.email, description: `${body.leaveDate} ${leaveType === "ANNUAL" ? "연차" : leaveType === "AM_HALF" ? "오전 반차" : "오후 반차"}`, status: "REGISTERED" });
       return { requestId: created.id, employeeName: employee.name, employeeCode: employee.code, leaveDate: body.leaveDate, leaveType, grantedDays: balance.grantedDays, usedDays: balance.usedDays, remainingDays: balance.remainingDays };
     });
+    after(() => dispatchPendingHrNotifications(10).then(() => undefined).catch(() => undefined));
     return NextResponse.json({ ok: true, ...result }, { status: 201 });
   } catch (error) {
     const code = error instanceof Error ? error.message : "UNKNOWN";

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   canRequestAnnualLeave,
@@ -9,7 +9,7 @@ import {
   remainingAnnualLeaveMinutes,
 } from "@/lib/annualLeave";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
-import { notifyAdminsAboutApprovalRequest } from "@/lib/workboardApprovalNotifications";
+import { enqueueAbsenceStatusNotifications, dispatchPendingHrNotifications } from "@/lib/hrNotifications";
 
 type LeaveBody = {
   leaveType?: "ANNUAL" | "AM_HALF" | "PM_HALF" | "SPECIAL";
@@ -359,18 +359,15 @@ export async function POST(req: Request) {
         note: body.reason?.trim() || null,
       },
     });
+    await enqueueAbsenceStatusNotifications(tx, {
+      kind: "leave", requestId: created.id, employeeName: authenticatedEmployee.name,
+      employeeEmail: authenticatedEmployee.email, description: `${body.leaveDate} ${leaveType === "SPECIAL" ? "유급 특별휴가" : leaveType === "ANNUAL" ? "연차" : leaveType === "AM_HALF" ? "오전 반차" : "오후 반차"}`, status: "PENDING",
+    });
     return created;
   });
   if (!request) return NextResponse.json({ error: "특별휴가 잔여일 또는 날짜 중복을 확인해 주세요." }, { status: 409 });
 
-  // The request remains valid even if chat delivery is temporarily unavailable.
-  await notifyAdminsAboutApprovalRequest({
-    kind: "leave",
-    requestId: request.id,
-    employeeName: current.employee.name,
-    employeeCode: current.employee.code,
-    description: `${leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveType === "SPECIAL" ? "유급 특별휴가" : leaveType === "ANNUAL" ? "연차" : leaveType === "AM_HALF" ? "오전 반차" : "오후 반차"}`,
-  });
+  after(() => dispatchPendingHrNotifications(10).then(() => undefined).catch(() => undefined));
 
   return NextResponse.json({ ok: true, request }, { status: 201 });
 }

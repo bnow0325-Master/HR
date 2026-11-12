@@ -1,8 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
-import { notifyEmployeeAboutApprovalDecision } from "@/lib/workboardApprovalNotifications";
-import { dispatchPendingHrNotifications, enqueueApprovedAbsenceNotification } from "@/lib/hrNotifications";
+import { dispatchPendingHrNotifications, enqueueAbsenceStatusNotifications } from "@/lib/hrNotifications";
 
 type ApprovalKind = "leave" | "business-trip";
 type ApprovalBody = {
@@ -116,8 +115,8 @@ export async function PATCH(request: Request) {
       });
       const leaveLabel = leave.leaveType === "SPECIAL" ? "유급 특별휴가" : leave.leaveType === "ANNUAL" ? "연차" : leave.leaveType === "AM_HALF" ? "오전 반차" : "오후 반차";
       const description = `${leave.leaveDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ${leaveLabel}`;
-      if (decision === "APPROVED") await enqueueApprovedAbsenceNotification(tx, {
-        kind: "leave", requestId: leave.id, employeeName: leave.employee.name, description,
+      await enqueueAbsenceStatusNotifications(tx, {
+        kind: "leave", requestId: leave.id, employeeName: leave.employee.name, employeeEmail: leave.employee.email, status: decision, description,
       });
       return {
         kind: "leave" as const,
@@ -166,8 +165,8 @@ export async function PATCH(request: Request) {
       },
     });
     const description = `${trip.startDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })} ~ ${trip.endDate.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })}`;
-    if (decision === "APPROVED") await enqueueApprovedAbsenceNotification(tx, {
-      kind: "business-trip", requestId: trip.id, employeeName: trip.employee.name, description,
+    await enqueueAbsenceStatusNotifications(tx, {
+      kind: "business-trip", requestId: trip.id, employeeName: trip.employee.name, employeeEmail: trip.employee.email, status: decision, description,
     });
     return {
       kind: "business-trip" as const,
@@ -189,7 +188,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "이미 처리되었거나 찾을 수 없는 신청입니다." }, { status: 409 });
   }
 
-  await notifyEmployeeAboutApprovalDecision({ ...notification, decision, reviewerNote });
-  after(() => dispatchPendingHrNotifications(1).then(() => undefined).catch(() => undefined));
+  after(() => dispatchPendingHrNotifications(10).then(() => undefined).catch(() => undefined));
   return NextResponse.json({ ok: true });
 }

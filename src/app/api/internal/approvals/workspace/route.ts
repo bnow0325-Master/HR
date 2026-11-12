@@ -5,10 +5,9 @@ import {
   isEmployeeDirectoryRequestAuthorized,
 } from "@/lib/internalApiAuth";
 import { prisma } from "@/lib/prisma";
-import { dispatchPendingHrNotifications, enqueueApprovedAbsenceNotification } from "@/lib/hrNotifications";
+import { dispatchPendingHrNotifications, enqueueAbsenceStatusNotifications } from "@/lib/hrNotifications";
 import {
   notifyCeoAboutApprovalDocument,
-  notifyEmployeeAboutApprovalDecision,
   notifyRequesterAboutApprovalDocument,
 } from "@/lib/workboardApprovalNotifications";
 
@@ -537,8 +536,8 @@ export async function POST(request: Request) {
             note: parsed.note,
           },
         });
-        if (decision === "APPROVED") await enqueueApprovedAbsenceNotification(tx, {
-          kind: "leave", requestId: leave.id, employeeName: leave.employee.name,
+        await enqueueAbsenceStatusNotifications(tx, {
+          kind: "leave", requestId: leave.id, employeeName: leave.employee.name, employeeEmail: leave.employee.email, status: decision,
           description: `${dateValue(leave.leaveDate)} ${leaveTypeLabel(leave.leaveType)}`,
         });
         return {
@@ -587,8 +586,8 @@ export async function POST(request: Request) {
           note: parsed.note,
         },
       });
-      if (decision === "APPROVED") await enqueueApprovedAbsenceNotification(tx, {
-        kind: "business-trip", requestId: trip.id, employeeName: trip.employee.name,
+      await enqueueAbsenceStatusNotifications(tx, {
+        kind: "business-trip", requestId: trip.id, employeeName: trip.employee.name, employeeEmail: trip.employee.email, status: decision,
         description: `${dateValue(trip.startDate)} ~ ${dateValue(trip.endDate)}`,
       });
       return {
@@ -609,8 +608,7 @@ export async function POST(request: Request) {
     if (!notification) {
       return NextResponse.json({ error: "이미 처리되었거나 최신 상태가 아닌 신청입니다." }, { status: 409, headers: noStoreHeaders });
     }
-    await notifyEmployeeAboutApprovalDecision({ ...notification, decision, reviewerNote: parsed.note });
-    after(() => dispatchPendingHrNotifications(1).then(() => undefined).catch(() => undefined));
+    after(() => dispatchPendingHrNotifications(10).then(() => undefined).catch(() => undefined));
     return NextResponse.json({ ok: true }, { headers: noStoreHeaders });
   }
   if (parsed.decision === "REJECTED" && !parsed.note) {

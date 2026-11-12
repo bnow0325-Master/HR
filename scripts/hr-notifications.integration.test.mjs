@@ -64,7 +64,7 @@ test('Monday summary is weekly only, crosses years, and is idempotent',async()=>
   const h=await harness({now:Date.parse('2026-12-28T00:00:00Z')});
   const api=await h.api('@/lib/hrNotificationSchedule');await api.enqueueDueHrSummary(new Date(h.now));await api.enqueueDueHrSummary(new Date(h.now));
   assert.equal(h.state.outbox.length,1);assert.match(h.state.outbox[0].message,/2026-12-28~2027-01-03/);
-  assert.equal(h.state.outbox[0].idempotencyKey,'hr-summary-ceo-week-2026-12-28');
+  assert.equal(h.state.outbox[0].idempotencyKey,'hr-chro-v1:hr-summary-ceo-week-2026-12-28');
   const query=h.state.summaries.find(q=>q.kind==='trip');assert.equal(query.where.status,'APPROVED');assert.equal(query.where.employee.active,true);
   assert.equal(query.where.startDate.lt.toISOString(),'2027-01-04T00:00:00.000Z');
 });
@@ -77,9 +77,9 @@ test('before 09:00 no schedule query occurs; empty daily decisions are remembere
   await api.enqueueDueHrSummary(new Date('2026-11-10T01:00:00Z'));assert.equal(h.state.outbox.length,1);assert.equal(h.state.outbox[0].status,'SKIPPED');
 });
 
-test('paused employee self-notification stays suppressed while representative reporting remains enabled',async()=>{
+test('new CHRO path covers all staff without changing generic paused webhooks',async()=>{
   const h=await harness({employee:{name:'Paused Test Employee'}});await h.post({type:'IN'});
-  assert.equal(h.state.outbox.length,1);assert.equal(h.state.outbox[0].audience,'operations');
+  assert.equal(h.state.outbox.length,2);assert.equal(h.state.outbox[0].audience,'operations');assert.equal(h.state.outbox[1].audience,'work');
 });
 
 for(const employee of [null,{email:'staff@example.test',systemRole:'MEMBER'},
@@ -118,12 +118,12 @@ for(const kind of ['leave','business-trip'])test(`concurrent ${kind} approval co
   const request=()=>new Request('http://hr.example.test/api/admin/approvals',{method:'PATCH',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({kind,requestId:'request-test',action:'APPROVE',reviewerNote:'DO_NOT_INCLUDE_IN_EXECUTIVE_MESSAGE'})});
   const responses=await Promise.all([api.PATCH(request()),api.PATCH(request())]);
-  assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);assert.equal(h.state.outbox.length,1);
-  assert.equal(h.state.outbox[0].recipientEmail,'executive@example.test');assert.equal(h.state.decisions.length,1);
+  assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);assert.equal(h.state.outbox.length,2);
+  assert.equal(h.state.outbox[0].recipientEmail,'requester@example.test');assert.equal(h.state.outbox[1].recipientEmail,'executive@example.test');assert.equal(h.state.decisions.length,0);
   assert.doesNotMatch(h.state.outbox[0].message,/DO_NOT_INCLUDE_IN_EXECUTIVE_MESSAGE/);
 });
 
-test('rejection is delivered only through the existing own-employee decision path',async()=>{
+test('rejection queues only the own-employee CHRO outbox event',async()=>{
   const h=await harness({employee:{email:'executive@example.test',systemRole:'ADMIN'},leaves:[{
     id:'request-test',status:'PENDING',leaveType:'ANNUAL',leaveDate:new Date('2026-11-09T00:00:00Z'),
     employee:{id:'requester-test',code:'fixture',name:'Test Requester',email:'requester@example.test'},
@@ -131,5 +131,78 @@ test('rejection is delivered only through the existing own-employee decision pat
   const api=await h.api('@/app/api/admin/approvals/route');
   const response=await api.PATCH(new Request('http://hr.example.test/api/admin/approvals',{method:'PATCH',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({kind:'leave',requestId:'request-test',action:'REJECT',reviewerNote:'Test reason'})}));
-  assert.equal(response.status,200);assert.equal(h.state.outbox.length,0);assert.equal(h.state.decisions.length,1);
+  assert.equal(response.status,200);assert.equal(h.state.outbox.length,1);assert.equal(h.state.decisions.length,0);assert.equal(h.state.outbox[0].recipientEmail,'requester@example.test');
+});
+
+test('CHRO activation is explicit and previously stored SENT messages are never replayed',async()=>{
+  const h=await harness();await h.post({type:'IN'});
+  const api=await h.api('@/lib/hrNotifications');
+  h.state.outbox.push({id:'old-sent',idempotencyKey:'old-sent-key',status:'SENT',attempts:1,nextAttemptAt:new Date(h.now-1),createdAt:new Date(h.now-5000),remoteMessageSeq:38});
+  h.env.HR_CHRO_NOTIFICATIONS_START_AT='';
+  await api.dispatchPendingHrNotifications(10);assert.equal(h.state.fetches.length,0);assert.equal(h.state.outbox[0].status,'PENDING');
+  h.env.HR_CHRO_NOTIFICATIONS_START_AT=new Date(h.now-1000).toISOString();
+  await api.dispatchPendingHrNotifications(10);
+  assert.equal(h.state.fetches.length,2);assert.equal(h.state.outbox[2].remoteMessageSeq,38);
+  for(const sent of h.state.fetches){
+    assert.equal(sent.url,'https://chat.bnow.co.kr/api/staff-chat/ai-executives/chro/employee-messages');
+    assert.notEqual(sent.authorization,'Bearer test-only-token');
+    assert.equal('senderName' in sent,false);assert.equal('audience' in sent,false);
+  }
+});
+
+test('cancelled checkout suppresses a queued successful checkout rather than sending contradictory states',async()=>{
+  const h=await harness();await h.post({type:'OUT'});await h.post({action:'CANCEL_OUT'});
+  await(await h.api('@/lib/hrNotifications')).dispatchPendingHrNotifications(10);
+  assert.equal(h.state.outbox.filter(r=>r.status==='SKIPPED').length,2);
+  assert.equal(h.state.fetches.length,2);
+  assert.ok(h.state.fetches.every(r=>r.message.includes('취소')));
+});
+
+test('an already decided absence suppresses a pending request confirmation and approval prompt',async()=>{
+  const h=await harness();
+  h.state.leaves=[{id:'absence-test',status:'PENDING',employee:{active:true,email:'staff@example.test'}}];
+  const api=await h.api('@/lib/hrNotifications');
+  await api.enqueueAbsenceStatusNotifications(h.db,{kind:'leave',requestId:'absence-test',employeeName:'Test Employee',employeeEmail:'staff@example.test',description:'2026-11-10 연차',status:'PENDING'});
+  h.state.leaves[0].status='APPROVED';
+  await api.dispatchPendingHrNotifications(10);
+  assert.equal(h.state.fetches.length,0);assert.ok(h.state.outbox.every(r=>r.status==='SKIPPED'));
+});
+
+test('missing checkout is keyed once per workdate, excludes pre-cutover sessions and rechecks an added OUT before dispatch',async()=>{
+  const h=await harness({now:Date.parse('2026-11-13T00:05:00Z')});
+  h.db.employee.findMany=async()=>[{id:'employee-test',email:'staff@example.test'}];
+  h.db.employee.findUnique=async()=>({active:true,workboardEnabled:true,attendanceEnabled:true,email:'staff@example.test'});
+  h.state.records=[{id:'in-test',employeeId:'employee-test',type:'IN',timestamp:new Date('2026-11-12T00:00:00Z'),cancelledAt:null}];
+  const schedule=await h.api('@/lib/hrMissingCheckoutSchedule');
+  assert.equal((await schedule.enqueueDueMissingCheckouts(new Date(h.now))).queued,0);
+  h.env.HR_CHRO_NOTIFICATIONS_START_AT='2026-11-11T00:00:00Z';
+  assert.equal((await schedule.enqueueDueMissingCheckouts(new Date(h.now))).queued,1);
+  assert.equal((await schedule.enqueueDueMissingCheckouts(new Date(h.now))).queued,0);
+  h.state.records.push({id:'out-test',employeeId:'employee-test',type:'OUT',timestamp:new Date('2026-11-12T09:00:00Z'),cancelledAt:null});
+  await(await h.api('@/lib/hrNotifications')).dispatchPendingHrNotifications(10);
+  assert.equal(h.state.fetches.length,0);assert.equal(h.state.outbox[0].status,'SKIPPED');
+});
+
+test('outbox failure rolls back an approval status and its audit in the same transaction',async()=>{
+  const h=await harness({employee:{email:'executive@example.test',systemRole:'ADMIN'},failEnqueue:true,leaves:[{
+    id:'request-test',status:'PENDING',leaveType:'ANNUAL',leaveDate:new Date('2026-11-09T00:00:00Z'),
+    employee:{id:'requester-test',code:'fixture',name:'Test Requester',email:'requester@example.test'},
+  }]});
+  const api=await h.api('@/app/api/admin/approvals/route');
+  await assert.rejects(()=>api.PATCH(new Request('http://hr.example.test/api/admin/approvals',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'leave',requestId:'request-test',action:'APPROVE',reviewerNote:'Synthetic approval'})})));
+  assert.equal(h.state.leaves[0].status,'PENDING');assert.equal(h.state.audits.length,0);assert.equal(h.state.fetches.length,0);
+});
+
+test('inactive chat recipient is surfaced for review instead of retrying forever; a missing new endpoint stays retryable',async()=>{
+  const h=await harness();await h.post({type:'IN'});
+  const api=await h.api('@/lib/hrNotifications');
+  h.state.respond=()=>Response.json({error:'recipient not found'},{status:404});
+  await api.dispatchPendingHrNotifications(1);
+  assert.equal(h.state.outbox[0].status,'BLOCKED');
+  await api.dispatchPendingHrNotifications(1);assert.equal(h.state.fetches.length,2);
+  assert.equal(h.state.outbox[1].status,'BLOCKED');
+  const again=await harness();await again.post({type:'IN'});
+  again.state.respond=()=>Response.json({error:'Not Found'},{status:404});
+  await(await again.api('@/lib/hrNotifications')).dispatchPendingHrNotifications(1);
+  assert.equal(again.state.outbox[0].status,'PENDING');
 });
