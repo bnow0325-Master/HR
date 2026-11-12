@@ -366,7 +366,7 @@ export default function LeavePage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">휴가 관리</h1>
           <p className="mt-2 text-sm text-slate-500">
-            연차 현황을 한눈에 확인하고 휴가를 신청할 수 있습니다.
+            연차와 별도 유급 특별휴가 현황을 확인하고 휴가를 신청할 수 있습니다.
           </p>
         </div>
         <Link
@@ -426,9 +426,14 @@ export default function LeavePage() {
           {specialSummary && specialSummary.grantedDays > 0 && (
             <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
               <h2 className="text-lg font-bold text-emerald-950">유급 특별휴가 · 연차 별도</h2>
-              <p className="mt-2 text-sm text-emerald-900">부여 {specialSummary.grantedDays}일 · 사용 {specialSummary.usedDays}일 · 승인 대기 {specialSummary.pendingDays}일 · 사용 가능 <strong>{specialSummary.remainingDays}일</strong></p>
-              {specialGrants.map((grant) => <p key={grant.id} className="mt-2 text-sm text-emerald-900">근거일 {formatDate(grant.sourceWorkDate)} · {grant.reason}</p>)}
-              <p className="mt-2 text-xs text-emerald-800">휴일근로 임금 정산과는 별도입니다.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-emerald-950 sm:grid-cols-4">
+                <div className="rounded-lg bg-white p-3">부여 <strong className="block text-lg">{specialSummary.grantedDays}일</strong></div>
+                <div className="rounded-lg bg-white p-3">사용 <strong className="block text-lg">{specialSummary.usedDays}일</strong></div>
+                <div className="rounded-lg bg-white p-3">승인 대기 <strong className="block text-lg">{specialSummary.pendingDays}일</strong></div>
+                <div className="rounded-lg border border-emerald-400 bg-white p-3">사용 가능 <strong className="block text-lg">{specialSummary.remainingDays}일</strong></div>
+              </div>
+              <div className="mt-3 divide-y divide-emerald-200">{specialGrants.map((grant) => <p key={grant.id} className="py-2 text-sm text-emerald-900">근거일 {formatDate(grant.sourceWorkDate)} · {grant.reason}</p>)}</div>
+              <p className="mt-2 text-sm text-emerald-800">휴일근로 임금 정산과는 별도입니다.</p>
             </section>
           )}
 
@@ -498,8 +503,7 @@ export default function LeavePage() {
             >
               <h2 className="text-xl font-bold text-slate-900">휴가 신청</h2>
               <p className="mt-1 text-sm text-slate-500">
-                휴가 종류와 날짜를 선택해 신청하세요. 잔여 연차가 -12일이 될
-                때까지 신청할 수 있습니다.
+                {leaveType === "SPECIAL" ? "특별휴가는 별도 잔여일 범위에서 신청할 수 있습니다." : "휴가 종류와 날짜를 선택해 신청하세요. 잔여 연차가 -12일이 될 때까지 신청할 수 있습니다."}
               </p>
               <div className="mt-4 flex flex-col gap-3">
                 <label className="text-sm font-medium text-slate-600">

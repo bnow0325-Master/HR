@@ -10,6 +10,7 @@ import {
   statutoryAnnualLeaveDays,
 } from "@/lib/annualLeave";
 import { prisma } from "@/lib/prisma";
+import { getCurrentWorkboardEmployee } from "@/lib/workboardSession";
 import {
   aggregate,
   formatMinutes,
@@ -222,6 +223,9 @@ export default async function AdminPage({
   }>;
 }) {
   if (!(await isAdmin())) redirect("/admin/login");
+  const currentEmployee = await getCurrentWorkboardEmployee("any");
+  const ceoEmail = (process.env.APPROVAL_CEO_EMAIL?.trim() || "elon.choo@bnow.co.kr").toLowerCase();
+  const canGrantSpecialLeave = currentEmployee?.email?.toLowerCase() === ceoEmail && currentEmployee.systemRole === "ADMIN" && currentEmployee.workboardEnabled;
 
   const {
     period: periodParam,
@@ -555,12 +559,12 @@ export default async function AdminPage({
           >
             직원 휴가 직접 등록
           </Link>
-          <Link
+          {canGrantSpecialLeave && <Link
             href="/admin/special-leave-grants"
             className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 font-semibold text-emerald-800 hover:bg-emerald-100"
           >
             유급 특별휴가 부여
-          </Link>
+          </Link>}
           <Link
             href="/admin/approvals"
             className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 font-semibold text-amber-800 hover:bg-amber-100"
