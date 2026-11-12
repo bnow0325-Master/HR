@@ -122,7 +122,7 @@ export default async function AdminAttendanceRecordsPage({
           <table className="w-full min-w-[560px] border-collapse text-left text-sm">
             <caption className="sr-only">직원별 날짜, 출근·퇴근 시각, 근무시간, 근태 상태</caption>
             <thead className="bg-slate-50 text-slate-600"><tr>
-              <th scope="col" className="sticky left-0 z-10 whitespace-nowrap bg-slate-50 px-2 py-3 sm:px-3">직원</th>
+              <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3" style={{ position: "sticky", left: 0, zIndex: 10, backgroundColor: "#f8fafc" }}>직원</th>
               <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">날짜</th>
               <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">상태</th>
               <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">출근</th>
@@ -131,7 +131,7 @@ export default async function AdminAttendanceRecordsPage({
               <th scope="col" className="whitespace-nowrap px-2 py-3 sm:px-3">상세</th>
             </tr></thead>
             <tbody>{report.rows.map((row) => <tr key={`${row.employeeId}:${row.date}`} className="border-t border-slate-100 align-middle">
-              <th scope="row" className="sticky left-0 z-10 whitespace-nowrap bg-white px-2 py-2.5 font-semibold text-slate-900 sm:px-3" title={`${row.code} · ${row.department ?? "부서 미지정"}`}>{row.name}</th>
+              <th scope="row" className="whitespace-nowrap px-2 py-2.5 font-semibold text-slate-900 sm:px-3" style={{ position: "sticky", left: 0, zIndex: 10, backgroundColor: "#fff" }} title={`${row.code} · ${row.department ?? "부서 미지정"}`}>{row.name}</th>
               <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-slate-600 sm:px-3" title={row.date}>{row.date.slice(5).replace("-", ".")}</td>
               <td className="whitespace-nowrap px-2 py-2.5 sm:px-3"><span className={statusTone(row)}>{statusLabel(row)}</span></td>
               <td className="whitespace-nowrap px-2 py-2.5 tabular-nums sm:px-3">{row.firstIn ?? "—"}</td>
