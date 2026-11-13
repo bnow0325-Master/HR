@@ -1,0 +1,87 @@
+{
+  "kind": "technical execution proposal; not operational approval",
+  "date_kst": "2026-11-13",
+  "owner": "CHRO execution / CTO preparation",
+  "base_main": "1523a005e1ffdc4794e87ef53452db15a9601654",
+  "related_source": {
+    "hr_pr": 133,
+    "hr_head": "659c6711993f434493fb6d477c238d7fad6255e6",
+    "chat_pr": 167,
+    "chat_head": "7f3bbe2df44990b74c263abbea2acaaeedd93bfe"
+  },
+  "original_file": {
+    "name": "chro-readonly-preflight.mjs",
+    "sha256": "0b0a2326650f078107b0feb968c3327c6bc010c7e219500aa0bb52e1abb649a7",
+    "state": "Preserved unchanged; not rerun",
+    "review": "No literal production credential value found in source. Database adapter credential fields and runtime token SHA-256 handling are present. Which syntax triggered command_inline_credential is unverified; do not assume false positive."
+  },
+  "replacement_artifacts": [
+    {
+      "name": "chro-metadata-preflight.mjs",
+      "sha256": "3fc51cd8f96e6b61af08b65658eb73580bee871dd5fafbe1a9c892153b0f76f9",
+      "scope": [
+        "Fixed docker inspect projection for exactly bnow-checkinout-app-1 and bnow-chat-server-api-1",
+        "Container name/id/image reference/image digest/state/startedAt only"
+      ],
+      "reads_existing_environment": false,
+      "reads_database": false,
+      "executes_inside_container": false,
+      "network_requests": 0
+    },
+    {
+      "name": "chro-webhook-compare-proposal.mjs",
+      "sha256": "1b30a7a343583b2cf30291a28461eef2891a25cacdef0774a1431bd4bf7c5799",
+      "scope": [
+        "Separate sensitive-read approval required",
+        "Fixed two docker exec node processes read existing container environment in memory",
+        "Fresh 32-byte random challenge HMAC; tags captured only in parent process and never returned in final output",
+        "HR trims existing shared root input; Chat preserves raw input, matching reviewed application paths",
+        "Canonical base destination, configured cutover, employee delivery flag booleans only",
+        "Container id/image/startedAt consistency before and after"
+      ],
+      "reads_existing_environment": true,
+      "reads_database": false,
+      "network_requests": 0,
+      "output_exclusions": [
+        "Raw values",
+        "Database URLs",
+        "Token hashes",
+        "HMAC tags",
+        "Nonce",
+        "Employees/emails/outbox rows",
+        "Raw child stdout/stderr"
+      ]
+    }
+  ],
+  "procedure": [
+    "CHRO reviews both exact files and hashes; prior approval of 0b0a2326 does not cover either new file.",
+    "Submit each selected file separately through the formal Alpacon verified-file workflow with explicit purpose, 1-ubuntu target, confirmed existing operator account, exact file bytes/hash and command+webftp scope as needed for artifact staging. No permission/configuration changes. Do not use a different execution route or identity to bypass denial.",
+    "The script requires the new WorkSession UUID as its single argument. UUID syntax validation is not proof of active approval; Alpacon must enforce active session and file approval.",
+    "Run metadata-only proposal first only after its formal approval; inspect generic failure or exact identities. A successful result does not establish backups, recipient readiness or deployment readiness.",
+    "Only if separately approved, run the sensitive-read comparison proposal. No credential value is typed into script, command, environment override or tool arguments. Existing values stay in container/parent memory; transient proof travels only via captured child pipe.",
+    "On any denial, timeout, invalid flags/proofs, missing context, stopped/restarted/replaced container or nonzero exit, stop and preserve the refusal. No sudo/alternate account/command/encoded-payload retry. Tool acceptance is unverified until formal review.",
+    "Archive only aggregate final JSON. Do not archive child output, tags, nonce, original environment or debug logs. Close only the executing operator's own session.",
+    "Matching shared inputs is necessary only; it does not verify derived CHRO authentication, route availability, employee/recipient mapping, outbox/cutover semantics, duplicate handling, device receipt or restore. Keep those gates explicitly pending."
+  ],
+  "remaining_gates": [
+    "HR/PostgreSQL or MariaDB actual recipient/outbox aggregates require a separately reviewed data-minimizing plan; these proposals contain no SQL/DB adapter",
+    "HR complete backup and isolated restore including actual restore evidence",
+    "CHRO transport and Chat receiver deployment/rollback preparation",
+    "Actual employee session and Android/iPhone acceptance",
+    "Operational approval"
+  ],
+  "validation": {
+    "local": "10 synthetic tests passed; Docker mocked; embedded Node environment probes run only with synthetic fixtures",
+    "production_runs": 0,
+    "production_secret_reads": 0,
+    "messages_sent": 0,
+    "operational_changes": 0,
+    "security_review_acceptance": "NOT_TESTED"
+  },
+  "limitations": [
+    "This does not prove which exact original syntax caused the security rejection",
+    "The comparison program intentionally still accesses existing sensitive runtime configuration and must receive independent approval",
+    "No claim that new code automatically passes Alpacon review",
+    "Technical JSON proposal; not a new policy or formal internal approval document"
+  ]
+}
