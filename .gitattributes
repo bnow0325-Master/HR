@@ -1,0 +1,4 @@
+deploy/hr-notifications/chro-metadata-preflight.mjs text eol=lf
+deploy/hr-notifications/chro-webhook-compare-proposal.mjs text eol=lf
+deploy/hr-notifications/chro-preflight-split.test.mjs text eol=lf
+deploy/hr-notifications/chro-preflight-split-review.json text eol=lf

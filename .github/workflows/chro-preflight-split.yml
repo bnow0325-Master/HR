@@ -1,0 +1,28 @@
+name: CHRO preflight proposal fixtures
+on:
+  pull_request:
+    paths:
+      - deploy/hr-notifications/chro-*-preflight.mjs
+      - deploy/hr-notifications/chro-webhook-compare-proposal.mjs
+      - deploy/hr-notifications/chro-preflight-split.test.mjs
+      - .github/workflows/chro-preflight-split.yml
+  push:
+    branches:
+      - codex/chro-preflight-split-20261113
+    paths:
+      - deploy/hr-notifications/chro-*-preflight.mjs
+      - deploy/hr-notifications/chro-webhook-compare-proposal.mjs
+      - deploy/hr-notifications/chro-preflight-split.test.mjs
+      - .github/workflows/chro-preflight-split.yml
+permissions:
+  contents: read
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - run: node --test deploy/hr-notifications/chro-preflight-split.test.mjs
